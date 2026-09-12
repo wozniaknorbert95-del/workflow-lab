@@ -1,7 +1,7 @@
 # Batch 02 — Cloud Agent MR wave (preview)
 
-**Starts when:** Batch 01 exit gate met (Bugbot unblocked)  
-**Plan ref:** `ROADMAP-MASTER.md` Batch 2
+**Started:** 2026-09-12 · **Plan ref:** `ROADMAP-MASTER.md` Batch 2  
+**Prerequisite:** Batch 01 CLOSED (GitHub OAuth reconnect 2026-09-12)
 
 | ID | Task | Status | Evidence |
 |----|------|--------|----------|

@@ -2,13 +2,23 @@
 
 One page. Newest first. Every irreversible choice lives here.
 
+## D-W3-GITHUB-OAUTH (2026-09-12) — stale OAuth fix (Integrations Connect)
+
+**Symptom:** Integrations → GitHub → *Failed to load GitHub settings*; `POST /api/dashboard/get-github-installations` → **500 internal error**. Cloud Agent git worked (App 161116895) but auto-PR/Bugbot failed.
+
+**Root cause:** Corrupt **User OAuth** record on Cursor backend after repeated reinstall/reconnect cycles during W-05 (GitHub **App** ≠ Integrations **OAuth** — two paths).
+
+**Fix:** `POST /api/dashboard/disconnect-github` (removed 1 stale link) → Add Provider → GitHub → reconnect. **Verified 2026-09-12 ~13:01 UTC:** API 200, `githubConnected: true`, user `wozniaknorbert95-del`, install **161116895**, `workflow-lab` with `bugBotEnabled: true`.
+
+**If recurrence:** incognito + revoke Cursor on github.com/settings/applications → reconnect; else Cursor support manual flush ([forum thread](https://forum.cursor.com/t/support-failed-to-load-github-settings/160868)).
+
 ## D-W3-COST (2026-09-12) — F3 Cloud Agent cost baseline (Batch 1)
 
 | Run | Agent | PR | CI run | $ marginal |
 |-----|-------|-----|--------|------------|
 | W-05 | `bc-c187d412` | [#14](https://github.com/wozniaknorbert95-del/workflow-lab/pull/14) | [34693117577](https://github.com/wozniaknorbert95-del/workflow-lab/actions/runs/34693117577) | $0 (included Pro+) |
-| CA-1 | pending | issue [#2](https://github.com/wozniaknorbert95-del/workflow-lab/issues/2) | — | — |
-| CA-3 | pending | issue [#4](https://github.com/wozniaknorbert95-del/workflow-lab/issues/4) | — | — |
+| CA-1 | `bc-54ca70ec` | [#19](https://github.com/wozniaknorbert95-del/workflow-lab/pull/19) | [34694052944](https://github.com/wozniaknorbert95-del/workflow-lab/actions/runs/34694052944) | $0 (included) |
+| CA-3 | `bc-4b9bb898` | [#20](https://github.com/wozniaknorbert95-del/workflow-lab/pull/20) | [34694054897](https://github.com/wozniaknorbert95-del/workflow-lab/actions/runs/34694054897) | $0 (included) |
 
 **Plan:** `docs/ROADMAP-MASTER.md` · current batch `docs/BATCH-01.md`.
 
