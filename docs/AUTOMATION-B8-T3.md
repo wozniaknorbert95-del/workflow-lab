@@ -11,8 +11,9 @@
 | --- | --- |
 | **Nazwa** | `workflow-lab: agent issue → Cloud Agent` |
 | **Repo** | `wozniaknorbert95-del/workflow-lab` |
-| **Trigger** | GitHub → **Issue opened** (lub **Issue labeled**) |
-| **Filter** | Label contains **`agent`** |
+| **Trigger** | GitHub → **Any Comment** on `workflow-lab` |
+| **Filter** | (optional) keyword — domyślnie każdy komentarz na issue/PR |
+| **Note** | UI Cursor (2026-09-12) nie oferuje „Issue opened” w tym flow — issue z label `agent` + **komentarz** startuje agenta bez `@cursor` |
 | **Agent** | Cloud Agent |
 | **Branch prefix** | `cursor/` (domyślne) |
 | **Auto-open PR** | ON |

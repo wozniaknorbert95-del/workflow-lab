@@ -2,6 +2,16 @@
 
 One page. Newest first. Every irreversible choice lives here.
 
+## D-B8-AUTOMATION (2026-09-12) — B8-T3 Automation PASS
+
+**Automation:** [workflow-lab: agent issue → Cloud Agent](https://cursor.com/automations/64ead0a5-aeb1-11f1-bf4b-42ffb4d10ea7) — **enabled**.
+
+**Trigger (actual UI):** GitHub **Any Comment** on `workflow-lab` (not Issue opened — Cursor UI limitation). Smoke: comment on [#38](https://github.com/wozniaknorbert95-del/workflow-lab/issues/38#issuecomment-5646344422) → Run History **Running** → agent `bc-9172fb9e` → [PR #40](https://github.com/wozniaknorbert95-del/workflow-lab/pull/40) (author `app/cursor`), CI `validate` SUCCESS.
+
+**Workflow:** Issue with label `agent` + **one comment** (no `@cursor` needed) starts Cloud Agent. Open Pull Request tool enabled.
+
+**Evidence:** `docs/evidence/b8-t3-automation-running.png` · prompt `docs/AUTOMATION-B8-T3.md`
+
 ## D-F4-SLACK-PARK (2026-09-12) — Slack odłożony (Batch 8 scope cut)
 
 **Decyzja Dowódcy:** Slack **nie** podpinamy w tej fazie. Uznany za zbędny — Linear mobile + GitHub mobile + Cursor wystarczą.

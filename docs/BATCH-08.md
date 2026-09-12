@@ -7,7 +7,7 @@
 |----|------|--------|----------|
 | B8-T1 | ~~Slack Connect~~ | **PARKED** | Odłożone — Linear + GitHub mobile wystarczą na teraz |
 | B8-T2 | Automation: daily digest | PENDING | GitHub/Linear event, bez Slack |
-| B8-T3 | Automation: `agent` issue → Cloud Agent | **NEXT** | Label `agent` on GitHub → trigger |
+| B8-T3 | Automation: comment → Cloud Agent | **PASS** | [Automation 64ead0a5](https://cursor.com/automations/64ead0a5-aeb1-11f1-bf4b-42ffb4d10ea7) ON · comment on [#38](https://github.com/wozniaknorbert95-del/workflow-lab/issues/38#issuecomment-5646344422) → agent `bc-9172fb9e` → [PR #40](https://github.com/wozniaknorbert95-del/workflow-lab/pull/40) CI green |
 | B8-T4 | Grok Bot BADACZ (research) | PENDING | Cursor dashboard |
 | B8-T5 | Grok Bot PM (Linear status) | PENDING | Zamiennik części notyfikacji Slack |
 
@@ -15,4 +15,4 @@
 
 **Prerequisite:** W-06 PASS ✅ · Slack nie blokuje bramki
 
-**Next action:** B8-T3 — Automation: nowe GitHub issue z label `agent` → `@cursor` / plan implementacji
+**Next action:** Merge [PR #40](https://github.com/wozniaknorbert95-del/workflow-lab/pull/40) (Commander) → B8-T4 Grok BADACZ lub B8-T2 daily digest
