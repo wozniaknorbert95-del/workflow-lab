@@ -1,0 +1,55 @@
+Search
+BADACZ
+Facts (checked 2026-09-12)
+Marketplace
+Norbert Wozniak
+Update
+BADACZ
+Today 4:20 PM
+
+Hey Norbert — good to meet you.
+
+What’s the main thing you want me helping with in your engineering work?
+
+4:20 PM
+
+Research task (official docs only):
+
+For public GitHub repositories like wozniaknorbert95-del/workflow-lab — are standard GitHub-hosted runner minutes free?
+
+Format: Facts (URL + date 2026-09-12) → Hypotheses (if any) → One recommendation. No code.
+
+4:21 PM
+
+Checking GitHub’s official docs on hosted-runner minutes for public repos.
+
+4:21 PM
+
+Facts (checked 2026-09-12)
+
+Official billing docs: “GitHub Actions usage is free for … public repositories that use standard GitHub-hosted runners.”
+https://docs.github.com/en/billing/concepts/product-billing/github-actions
+
+Same page: “The use of standard GitHub-hosted runners is free: In public repositories …”
+
+Caveat on that page: “Larger runners are always charged for, even when used by public repositories …”
+
+Runner docs: “Use of the standard GitHub-hosted runners is free and unlimited on public repositories.”
+https://docs.github.com/en/actions/how-tos/write-workflows/choose-where-workflows-run/choose-the-runner-for-a-job#standard-github-hosted-runners-for-public-repositories
+
+So for a public repo like wozniaknorbert95-del/workflow-lab, standard labels (ubuntu-latest, windows-latest, macos-latest, etc.) do not consume billable minutes.
+
+Hypotheses
+
+None material: docs are explicit for public repos + standard runners. Only ambiguity is whether a workflow accidentally uses a larger runner (those are always billed).
+
+Recommendation
+
+Treat standard GitHub-hosted minutes as free on that public repo; avoid larger runners unless you accept per-minute billing.
+
+4:21 PM
+
+
+
+
+BADACZ replied

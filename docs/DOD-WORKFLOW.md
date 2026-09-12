@@ -4,7 +4,19 @@ PASS only with evidence (PR URL, API response, or `DECISIONS.md` line). Do not m
 
 **Fully working** = W-01..W-06 + W-07 + W-08 PASS — **ACHIEVED 2026-09-12** (W-06 phone loop). W-09/W-10 PASS.
 
-Updated: 2026-09-12 (W-06 PASS; Batch 07 closed; `DECISIONS.md` D-W6-PHONE).
+Updated: 2026-09-12 (Batch 08 closed F4 partial; `DECISIONS.md` D-B8-GROK-BADACZ).
+
+## F4 partial — Autonomia cz. 2 (master plan §5 Faza 4, Slack parked)
+
+| Criterion | Status | Evidence |
+| --- | --- | --- |
+| W-06 phone loop | PASS | D-W6-PHONE |
+| Automation: issue comment → Cloud Agent | PASS | D-B8-AUTOMATION · PR #40/#42 |
+| Grok Bot BADACZ (research) | PASS | D-B8-GROK-BADACZ · smoke report |
+| Slack | PARKED | D-F4-SLACK-PARK |
+| Daily digest + rytuały | PENDING | Batch 9 |
+
+**F4 verdict:** **PARTIAL PASS** (core autonomia bez Slack). Next: Batch 9 digest + rytuały.
 
 ## F2 exit — Memory AI (master plan §5 Faza 2)
 
