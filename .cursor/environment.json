@@ -1,9 +1,10 @@
 {
+  "name": "workflow-lab",
   "build": {
     "dockerfile": "Dockerfile",
-    "context": ".."
+    "context": "."
   },
-  "install": "true",
+  "install": "npm run lint && npm test",
   "terminals": [
     { "name": "dev", "command": "node src/hello.js" }
   ]
