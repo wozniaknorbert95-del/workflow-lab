@@ -42,3 +42,20 @@ npm run build
 ```
 
 Result: PASS, tests 5/5.
+
+## Post-Merge Workflow Dispatch
+
+- Workflow run: https://github.com/wozniaknorbert95-del/workflow-lab/actions/runs/34699792233
+- Result: `completed/success`, duration `12s`
+- Real digest comment: https://github.com/wozniaknorbert95-del/workflow-lab/issues/44#issuecomment-5646551206
+
+Final workflow-posted body:
+
+```md
+## Daily digest — 2026-09-12 16:36 Europe/Warsaw
+
+- Open agent issues: 0 — none
+- PRs waiting review/merge: 0 — none
+- CI red: 0 — none
+- One next action: No urgent workflow-lab action; continue Batch 9 rituals.
+```

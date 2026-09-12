@@ -12,7 +12,7 @@ One page. Newest first. Every irreversible choice lives here.
 
 **Implementation:** `.github/workflows/daily-digest.yml` runs `scripts/daily-digest.mjs`, posting open `agent` issues, open PRs, red CI, and one next action to issue #44. The script excludes the tracking issue itself from `agent` issue counts.
 
-**Evidence:** Cursor config screenshot `docs/evidence/b9-t1-cursor-automation-config.png`; Cursor run history screenshot `docs/evidence/b9-t1-cursor-automation-run-succeeded.png`; final smoke comment [#44](https://github.com/wozniaknorbert95-del/workflow-lab/issues/44#issuecomment-5646537349); screenshot `docs/evidence/b9-t1-digest-issue-smoke.png`; smoke report `docs/evidence/b9-t1-daily-digest-smoke.md`.
+**Evidence:** Cursor config screenshot `docs/evidence/b9-t1-cursor-automation-config.png`; Cursor run history screenshot `docs/evidence/b9-t1-cursor-automation-run-succeeded.png`; final smoke comment [#44](https://github.com/wozniaknorbert95-del/workflow-lab/issues/44#issuecomment-5646537349); screenshot `docs/evidence/b9-t1-digest-issue-smoke.png`; smoke report `docs/evidence/b9-t1-daily-digest-smoke.md`. Post-merge workflow dispatch [run 34699792233](https://github.com/wozniaknorbert95-del/workflow-lab/actions/runs/34699792233) completed success and posted real digest comment [#44](https://github.com/wozniaknorbert95-del/workflow-lab/issues/44#issuecomment-5646551206).
 
 ## D-B8-GROK-BADACZ (2026-09-12) — B8-T4 Grok Bot BADACZ PASS
 
