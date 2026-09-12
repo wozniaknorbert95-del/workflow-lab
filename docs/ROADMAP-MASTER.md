@@ -3,7 +3,7 @@
 **Source:** `workflow-marzen/00-PLAN-DZIALANIA.md` · **Lab scoreboard:** `DOD-WORKFLOW.md`  
 **Rule:** each batch = 5 tasks → verify gates → next batch. Human-stop = Dowódca only where marked.
 
-**Current batch:** [BATCH-09.md](./BATCH-09.md) · **Status:** PENDING (F4 rytuały + digest; Batch 8 **CLOSED**)
+**Current batch:** [BATCH-09.md](./BATCH-09.md) · **Status:** CLOSED (F4 core PASS; Slack + Grok PM parked optional)
 
 ---
 
@@ -13,7 +13,7 @@
 |---------|-------|------------|--------|
 | **1–3** | Cloud Agents + Bugbot | F3 | **CLOSED** (F3 PASS, Bugbot comment PARTIAL) |
 | **4–6** | Memory AI (docs + skills) | F2 | **CLOSED** (Batch 4–5) |
-| **7–9** | Mobile + Automations + Grok (Slack parked) | F4 | Batch 7–8 **CLOSED** · Batch 9 next |
+| **7–9** | Mobile + Automations + Grok (Slack parked) | F4 | **CLOSED** (Batch 09 closed; core loop ready) |
 | **10–12** | GitLab CE cutover | F0 | PENDING (VPS human-stop) |
 | **13–15** | Hardening + Academy sync | F5 + §8a | PENDING |
 
