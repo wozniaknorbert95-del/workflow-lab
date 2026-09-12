@@ -2,6 +2,16 @@
 
 One page. Newest first. Every irreversible choice lives here.
 
+## D-F4-SLACK-PARK (2026-09-12) — Slack odłożony (Batch 8 scope cut)
+
+**Decyzja Dowódcy:** Slack **nie** podpinamy w tej fazie. Uznany za zbędny — Linear mobile + GitHub mobile + Cursor wystarczą.
+
+**Plan impact:** Faza 4 master planu — punkt „SLACK podpięty” → **PARKED** do przyszłej sesji. Nie blokuje W-06 PASS ani Batch 8.
+
+**Zamienniki:** Linear notyfikacje, GitHub mobile, Grok Bot PM (B8-T5), Automations na eventach GitHub.
+
+**Revisit:** gdy pojawi się potrzeba kanału gaduły dla zespołu >1 osoba lub zewnętrznych integracji.
+
 ## D-W6-PHONE (2026-09-12) — W-06 PASS (phone loop closed)
 
 **Verdict:** PASS. Full loop from phone without laptop.

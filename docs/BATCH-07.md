@@ -10,4 +10,4 @@
 | B7-T3 | GitHub mobile merge | **PASS** | Squash merge `b8e261a` 2026-09-12T13:43:06Z (Commander phone) |
 | B7-T4 | W-06 PASS in DOD | **PASS** | `docs/DOD-WORKFLOW.md` W-06 · `D-W6-PHONE` |
 
-**Exit gate:** **ALL PASS** → W-06 closed → **Batch 8** (F4: Slack / Automations)
+**Exit gate:** **ALL PASS** → W-06 closed → **Batch 8** (F4: Automations + Grok; Slack parked)
