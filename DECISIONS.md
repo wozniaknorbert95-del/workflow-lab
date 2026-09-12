@@ -2,6 +2,18 @@
 
 One page. Newest first. Every irreversible choice lives here.
 
+## D-W3-LINEAR (2026-09-12) — workspace Quietforge is CO
+
+**Decision:** Command & control for this lab is Linear workspace **Quietforge** (`https://linear.app/quietforge`), team `QUI`, project `workflow-lab`. Labels `agent` / `review` / `blocked`. Six-field body lives in the project document + GitHub issue template.
+
+**Why not `quietforge-ops`:** Commander already signed up; the slug is `quietforge`. Recreating a second workspace would split the board.
+
+**C7:** no dsaas / ENT-* issues on this project. GitHub integration is account-wide today (Linear Reviews also lists other repos). Narrow the GitHub app later if the Reviews inbox is noisy.
+
+**Evidence:** project https://linear.app/quietforge/project/workflow-lab-93ba13d2e4b6 · issue QUI-5 · MCP user `wozniaknorbert95@gmail.com`.
+
+W-03 PASS. GitHub Issues remain the Cloud Agent seed (Cursor origin = GitHub).
+
 ## D-W01-PROTECT (2026-09-12) — native branch protection blocked
 
 GitHub API `branch-protection` on `main` returned **403**: private repos on Free cannot use classic protection. W-01 stays PARTIAL. Compensation: AGENTS.md (never push `main`) + merge-only-via-PR practice (PR #1). Revisit when Pro or public.
@@ -9,10 +21,6 @@ GitHub API `branch-protection` on `main` returned **403**: private repos on Free
 ## D-W4-LOOP (2026-09-12) — first laptop loop closed
 
 https://github.com/wozniaknorbert95-del/workflow-lab/pull/1 squash-merged (`4ea746d`). W-04 PASS. `.gitlab-ci.yml` is on `main` for future CE cutover; origin remains GitHub.
-
-## D-W3-LINEAR (2026-09-12) — pending Commander signup
-
-Linear workspace does not exist. Staff cannot register the Commander email. Until signup: GitHub Issues with label `agent` are interim CO for **this repo only**. W-03 FAIL. Clicks: `docs/LINEAR.md`.
 
 ## D-W0-ORIGIN (2026-09-12) — GitHub is lab origin until GitLab CE exists
 
