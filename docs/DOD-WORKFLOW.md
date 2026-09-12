@@ -2,9 +2,9 @@
 
 PASS only with evidence (PR URL, API response, or `DECISIONS.md` line). Do not mark PASS from hope.
 
-**Fully working** = W-01..W-05 + W-07 + W-08 PASS — **ACHIEVED 2026-09-12** (plan W-05 close). W-06 (phone) = next checkpoint after Linear mobile.
+**Fully working** = W-01..W-06 + W-07 + W-08 PASS — **ACHIEVED 2026-09-12** (W-06 phone loop). W-09/W-10 PASS.
 
-Updated: 2026-09-12 (F2 memory AI Batch 04 closed; `DECISIONS.md` D-F2-EXIT).
+Updated: 2026-09-12 (W-06 PASS; Batch 07 closed; `DECISIONS.md` D-W6-PHONE).
 
 ## F2 exit — Memory AI (master plan §5 Faza 2)
 
@@ -43,7 +43,7 @@ Updated: 2026-09-12 (F2 memory AI Batch 04 closed; `DECISIONS.md` D-F2-EXIT).
 | W-03 | Linear project `workflow-lab`, labels `agent`/`review`/`blocked`, 6-field template | PASS | Workspace https://linear.app/quietforge · project https://linear.app/quietforge/project/workflow-lab-93ba13d2e4b6 · labels created · template https://linear.app/quietforge/document/szablon-6-pol-agent-6decf6006360 · `DECISIONS.md` D-W3-LINEAR |
 | W-04 | One laptop loop: issue/PR → green CI → merge to `main` | PASS | https://github.com/wozniaknorbert95-del/workflow-lab/pull/1 merged 2026-09-12 (`4ea746d`) |
 | W-05 | One PR opened by Cursor Cloud Agent, CI green. Human merges. | PASS | Agent `bc-c187d412` → branch `cursor/greet-cloud-test-bfd7` → [PR #14](https://github.com/wozniaknorbert95-del/workflow-lab/pull/14) CI `validate` SUCCESS → squash-merged `8239f41` 2026-09-12. Infra: #12 ca-certificates, #13 curl. `DECISIONS.md` D-W5-CLOUD. |
-| W-06 | Linear mobile issue → Cloud Agent → GitHub mobile merge | FAIL | Next checkpoint after Linear mobile setup |
+| W-06 | Linear mobile issue → Cloud Agent → GitHub mobile merge | **PASS** | [QUI-10](https://linear.app/quietforge/issue/QUI-10) → agent `bc-2aeab115` → [PR #34](https://github.com/wozniaknorbert95-del/workflow-lab/pull/34) CI green → **GitHub mobile merge** `b8e261a` 2026-09-12. `DECISIONS.md` D-W6-PHONE. |
 | W-07 | Human gates: merge, secrets, no dual-origin, no dsaas deploy from lab | PASS | `AGENTS.md` §1; `DECISIONS.md` D-W0 / D-C7 |
 | W-08 | C7: dsaas not on this board | PASS | `DECISIONS.md` D-C7 |
 | W-09 | Cursor spend limit on. `$/MR` recorded after first cloud run | PASS | Pro+ On-Demand Unlimited. First cloud delivery W-05 agent `bc-c187d412`. Usage snapshot 2026-09-12: 96.8M tokens included, on-demand **$0** ([dashboard/usage](https://cursor.com/dashboard/usage)). `$/MR` marginal = **$0** on included plan (`DECISIONS.md` D-W9-USAGE). |
@@ -51,6 +51,5 @@ Updated: 2026-09-12 (F2 memory AI Batch 04 closed; `DECISIONS.md` D-F2-EXIT).
 
 ## How to raise a FAIL to PASS
 
-- W-01..W-05, W-07..W-10: **done** (2026-09-12). Repo **fully working** per strict DoD.
-- W-06: Linear mobile → Cloud Agent → GitHub mobile merge (next session).
+- W-01..W-10: **done** (2026-09-12). Repo **fully working** including phone loop (W-06).
 - F3 optional: CA-2/3 extra Cloud runs (`docs/W2-CLOUD-AGENTS.md`), GitLab CE cutover (`D-W0-ORIGIN`).

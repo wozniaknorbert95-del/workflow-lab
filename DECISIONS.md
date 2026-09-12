@@ -2,6 +2,20 @@
 
 One page. Newest first. Every irreversible choice lives here.
 
+## D-W6-PHONE (2026-09-12) — W-06 PASS (phone loop closed)
+
+**Verdict:** PASS. Full loop from phone without laptop.
+
+**Flow:**
+1. Linear mobile — [QUI-10](https://linear.app/quietforge/issue/QUI-10/w-06-phone-loop-batch-7) (In Progress, delegate Cursor)
+2. `@cursor` trigger → Cloud Agent `bc-2aeab115` → branch `cursor/w6-phone-loop-4fbb`
+3. [PR #34](https://github.com/wozniaknorbert95-del/workflow-lab/pull/34) auto-opened, CI `validate` SUCCESS
+4. **GitHub mobile squash merge** by Commander `2026-09-12T13:43:06Z` → `b8e261a`
+
+**Deliverable:** README line `Mobile loop (W-06): verified 2026-09-12 from phone.`
+
+**GitHub issue:** #32 closed by PR #34.
+
 ## D-W3-BUGBOT (2026-09-12) — Bugbot UI root cause (Batch 5 B5-T2)
 
 **Finding:** Integrations API showed `bugBotEnabled: true` for `workflow-lab`, but **Automations → Bugbot** had global **Enable Bugbot OFF** and coverage **0/0 enabled (0%)** for `wozniaknorbert95-del` GitHub.
