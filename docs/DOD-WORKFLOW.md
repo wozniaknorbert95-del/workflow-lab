@@ -4,7 +4,21 @@ PASS only with evidence (PR URL, API response, or `DECISIONS.md` line). Do not m
 
 **Fully working** = W-01..W-05 + W-07 + W-08 PASS — **ACHIEVED 2026-09-12** (plan W-05 close). W-06 (phone) = next checkpoint after Linear mobile.
 
-Updated: 2026-09-12 (F3 exit scorecard added; Batch 03 closed; `DECISIONS.md` D-F3-EXIT).
+Updated: 2026-09-12 (F2 memory AI Batch 04 closed; `DECISIONS.md` D-F2-EXIT).
+
+## F2 exit — Memory AI (master plan §5 Faza 2)
+
+| Criterion | Status | Evidence |
+| --- | --- | --- |
+| `ARCHITECTURE.md` one-pager | PASS | [PR #28](https://github.com/wozniaknorbert95-del/workflow-lab/pull/28) |
+| `PRODUCT.md` one-pager | PASS | [PR #28](https://github.com/wozniaknorbert95-del/workflow-lab/pull/28) |
+| `TESTING.md` one-pager | PASS | [PR #25](https://github.com/wozniaknorbert95-del/workflow-lab/pull/25) |
+| `DECISIONS.md` current | PASS | D-F3-EXIT, D-W3-GITHUB-OAUTH, D-W3-COST |
+| 3 Skills | PASS | `dodaj-test`, `dodaj-script`, `review-bezpieczenstwa` |
+| A1 audit filed | PASS | `docs/A1-AUDIT-2026-09-12.md` — 9.2/10 |
+| Agent zero convention questions | PASS | ARCHITECTURE “where to add” table + skills |
+
+**F2 verdict:** **PASS**. Next: Batch 5 (F2 scorecard formalize) → Batch 7 W-06 mobile.
 
 ## F3 exit — Cloud Agents (master plan §5 Faza 3)
 

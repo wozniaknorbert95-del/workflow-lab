@@ -2,6 +2,16 @@
 
 One page. Newest first. Every irreversible choice lives here.
 
+## D-F2-EXIT (2026-09-12) — Faza 2 Memory AI closed (Batch 04)
+
+**Verdict:** PASS.
+
+**Deliverables:** [PR #28](https://github.com/wozniaknorbert95-del/workflow-lab/pull/28) ARCHITECTURE + PRODUCT + 2 skills + A1 audit. [PR #25](https://github.com/wozniaknorbert95-del/workflow-lab/pull/25) TESTING.md. Skills 3/3 in `.cursor/skills/`.
+
+**Bugbot code smoke:** Issue #29 → agent `bc-1a1f68ac` → [PR #30](https://github.com/wozniaknorbert95-del/workflow-lab/pull/30) auto-PR, `greet(123)` regression test. Bugbot comment still PARTIAL → Batch 5 B5-T2.
+
+**A1 score:** 9.2/10 — `docs/A1-AUDIT-2026-09-12.md`.
+
 ## D-F3-EXIT (2026-09-12) — Faza 3 Cloud Agents closed (Batch 03)
 
 **Verdict:** PASS with Bugbot comment PARTIAL.
