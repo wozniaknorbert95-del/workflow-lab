@@ -4,7 +4,7 @@ PASS only with evidence (PR URL, API response, or `DECISIONS.md` line). Do not m
 
 **Fully working** = W-01..W-05 + W-07 + W-08 PASS. W-06 (phone) is a later checkpoint after Linear signup. W-03 cannot PASS without the Commander creating a Linear account (staff cannot register that email).
 
-Updated: 2026-09-12 (after merge of PR #1).
+Updated: 2026-09-12 (after merge of PR #1; Cloud Agent issue #5 seeded).
 
 ## Scoreboard
 
@@ -14,7 +14,7 @@ Updated: 2026-09-12 (after merge of PR #1).
 | W-02 | `npm run lint` + `npm test` + `npm run build` = AGENTS.md §2 = `.github/workflows/ci.yml` | PASS | CI job `validate` SUCCESS on PR #1 |
 | W-03 | Linear project `workflow-lab`, labels `agent`/`review`/`blocked`, 6-field template | FAIL | Account not created. GitHub Issues = interim only. See `docs/LINEAR.md`. |
 | W-04 | One laptop loop: issue/PR → green CI → merge to `main` | PASS | https://github.com/wozniaknorbert95-del/workflow-lab/pull/1 merged 2026-09-12 (`4ea746d`) |
-| W-05 | One PR opened by Cursor Cloud Agent, CI green. Human merges. | FAIL | Issue seeded (see GitHub `agent`). Commander starts it on cursor.com/agents. |
+| W-05 | One PR opened by Cursor Cloud Agent, CI green. Human merges. | FAIL | Seeded: https://github.com/wozniaknorbert95-del/workflow-lab/issues/5 . Commander starts it on cursor.com/agents. |
 | W-06 | Linear mobile issue → Cloud Agent → GitHub mobile merge | FAIL | Blocked on W-03 + W-05 |
 | W-07 | Human gates: merge, secrets, no dual-origin, no dsaas deploy from lab | PASS | `AGENTS.md` §1; `DECISIONS.md` D-W0 / D-C7 |
 | W-08 | C7: dsaas not on this board | PASS | `DECISIONS.md` D-C7 |
@@ -25,6 +25,6 @@ Updated: 2026-09-12 (after merge of PR #1).
 
 - W-01 remainder: GitHub Pro **or** public repo, then enable classic branch protection (require PR + required check `validate`). Until then: never push `main`.
 - W-03: Commander — 8 clicks in `docs/LINEAR.md`. Then add `D-W3-LINEAR` date here.
-- W-05: open the seeded Cloud Agent issue on cursor.com/agents. Merge the PR yourself.
+- W-05: open issue #5 on cursor.com/agents. Merge the PR yourself.
 - W-06: after W-03 and W-05.
 - W-09: one line in `DECISIONS.md` after the first billed cloud run.
