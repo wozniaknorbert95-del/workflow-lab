@@ -4,6 +4,7 @@ FROM node:20-bookworm-slim
 # (build log bld-1310fd83: "CAfile: none" without this package)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
+    curl \
     git \
     && rm -rf /var/lib/apt/lists/*
 
