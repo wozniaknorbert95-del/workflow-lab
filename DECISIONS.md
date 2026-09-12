@@ -2,6 +2,18 @@
 
 One page. Newest first. Every irreversible choice lives here.
 
+## D-W01-PROTECT (2026-09-12) — native branch protection blocked
+
+GitHub API `branch-protection` on `main` returned **403**: private repos on Free cannot use classic protection. W-01 stays PARTIAL. Compensation: AGENTS.md (never push `main`) + merge-only-via-PR practice (PR #1). Revisit when Pro or public.
+
+## D-W4-LOOP (2026-09-12) — first laptop loop closed
+
+https://github.com/wozniaknorbert95-del/workflow-lab/pull/1 squash-merged (`4ea746d`). W-04 PASS. `.gitlab-ci.yml` is on `main` for future CE cutover; origin remains GitHub.
+
+## D-W3-LINEAR (2026-09-12) — pending Commander signup
+
+Linear workspace does not exist. Staff cannot register the Commander email. Until signup: GitHub Issues with label `agent` are interim CO for **this repo only**. W-03 FAIL. Clicks: `docs/LINEAR.md`.
+
 ## D-W0-ORIGIN (2026-09-12) — GitHub is lab origin until GitLab CE exists
 
 **Decision:** `origin` of this repo is **GitHub** (account `wozniaknorbert95-del`). GitLab CE self-hosted remains the **target** origin from handbook D1 (07.09.2026), not the current fact.
