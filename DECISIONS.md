@@ -2,6 +2,24 @@
 
 One page. Newest first. Every irreversible choice lives here.
 
+## D-W9-USAGE (2026-09-12) — first Cloud Agent delivery cost baseline
+
+**Plan:** Pro+ · On-Demand Unlimited enabled.
+
+**First delivery:** W-05 agent `bc-c187d412` → [PR #14](https://github.com/wozniaknorbert95-del/workflow-lab/pull/14) (CI run [34693117577](https://github.com/wozniaknorbert95-del/workflow-lab/actions/runs/34693117577)).
+
+**Usage snapshot** ([cursor.com/dashboard/usage](https://cursor.com/dashboard/usage), 2026-09-12): **96.8M tokens** included (session total incl. infra retries), **on-demand $0**. Models: `composer-2.5-fast`, `cursor-grok-4.6-high`.
+
+**$/MR (W-05):** **$0 marginal** on included Pro+ quota. Revisit when first **on-demand** MR posts a dollar line on invoice.
+
+## D-W01-PROTECT (2026-09-12) — native branch protection ON
+
+**Status:** PASS (was PARTIAL on private Free).
+
+**Applied 2026-09-12** after [D-W01-PUBLIC](DECISIONS.md): `main` requires PR + required status check **`validate`** (strict). API: `PUT .../branches/main/protection`.
+
+**Evidence:** public repo + protection enabled; push direct to `main` blocked.
+
 ## D-W5-CLOUD (2026-09-12) — W-05 PASS (Cloud Agent loop closed)
 
 **Status:** PASS. Cloud Agent delivered W-05 test; human merged PR #14.
@@ -38,10 +56,6 @@ One page. Newest first. Every irreversible choice lives here.
 **Evidence:** project https://linear.app/quietforge/project/workflow-lab-93ba13d2e4b6 · issue QUI-5 · MCP user `wozniaknorbert95@gmail.com`.
 
 W-03 PASS. GitHub Issues remain the Cloud Agent seed (Cursor origin = GitHub).
-
-## D-W01-PROTECT (2026-09-12) — native branch protection blocked
-
-GitHub API `branch-protection` on `main` returned **403**: private repos on Free cannot use classic protection. W-01 stays PARTIAL. Compensation: AGENTS.md (never push `main`) + merge-only-via-PR practice (PR #1). Revisit when Pro or public.
 
 ## D-W4-LOOP (2026-09-12) — first laptop loop closed
 
