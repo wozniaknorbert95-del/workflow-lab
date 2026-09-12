@@ -2,6 +2,28 @@
 
 One page. Newest first. Every irreversible choice lives here.
 
+## D-W3-BUGBOT (2026-09-12) — Bugbot UI root cause (Batch 5 B5-T2)
+
+**Finding:** Integrations API showed `bugBotEnabled: true` for `workflow-lab`, but **Automations → Bugbot** had global **Enable Bugbot OFF** and coverage **0/0 enabled (0%)** for `wozniaknorbert95-del` GitHub.
+
+**URL:** https://cursor.com/automations/from-cursor/bugbot
+
+**Why zero PR comments:** Bugbot never ran — not a repo-config bug; global automation disabled + onboarding not completed.
+
+**Human-stop:** Enabling Bugbot requires **Usage-Based Billing** modal (~**$1.20/review** estimated). Commander must click **Enable Usage-Based Billing** at own risk/budget.
+
+**Evidence:** `docs/evidence/b5-t2-bugbot-before.png`, `docs/evidence/b5-t2-bugbot-billing-gate.png`
+
+**Rekomendacja R1:** Accept spend for lab smoke (1–2 PRs) OR defer Bugbot comment gate and proceed W-06 (Batch 7) — Bugbot nie blokuje phone loop.
+
+## D-W6-SETUP (2026-09-12) — W-06 issue + runbook (Batch 7 B7-T0)
+
+**Status:** SETUP PASS. Execution = Commander phone (human-stop merge).
+
+**Issue:** [#32](https://github.com/wozniaknorbert95-del/workflow-lab/issues/32) — Linear mobile → Cloud Agent → GitHub mobile merge.
+
+**Runbook:** `docs/W6-PHONE-LOOP.md` · tracker `docs/BATCH-07.md`.
+
 ## D-F2-EXIT (2026-09-12) — Faza 2 Memory AI closed (Batch 04)
 
 **Verdict:** PASS.
