@@ -27,6 +27,14 @@ Trigger: weekly.
 Action: open issue `chore: weekly security sweep` labeled `agent`.
 Body: run skill `review-bezpieczenstwa` on `main` since last sweep. Output = list or “clean”.
 
+**Implemented (B9-T5, 2026-09-12):**
+
+- GitHub Actions workflow: `.github/workflows/weekly-security-sweep.yml`
+- Reliable issue opener: `scripts/weekly-security-sweep.mjs`
+- Schedule: Monday `0 5 * * 1` UTC (morning Europe/Warsaw window during CEST)
+- Manual smoke path: workflow dispatch; script is idempotent per ISO week and reuses an existing open sweep issue instead of creating duplicates
+- Output issue body points to skill `review-bezpieczenstwa` and requires `PASS: clean` or exact blockers
+
 ## Automation 3 — label `agent` → plan comment
 
 Trigger: issue labeled `agent`.

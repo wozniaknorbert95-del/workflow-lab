@@ -4,7 +4,7 @@ PASS only with evidence (PR URL, API response, or `DECISIONS.md` line). Do not m
 
 **Fully working** = W-01..W-06 + W-07 + W-08 PASS — **ACHIEVED 2026-09-12** (W-06 phone loop). W-09/W-10 PASS.
 
-Updated: 2026-09-12 (B9-T3 evening ritual PASS; `DECISIONS.md` D-B9-EVENING-RITUAL).
+Updated: 2026-09-12 (B9-T5 weekly security sweep PASS; `DECISIONS.md` D-B9-WEEKLY-SECURITY-SWEEP).
 
 ## F4 partial — Autonomia cz. 2 (master plan §5 Faza 4, Slack parked)
 
@@ -17,8 +17,10 @@ Updated: 2026-09-12 (B9-T3 evening ritual PASS; `DECISIONS.md` D-B9-EVENING-RITU
 | Daily digest | PASS | D-B9-DAILY-DIGEST · issue #44 smoke |
 | Morning ritual 10′ | PASS | D-B9-MORNING-RITUAL · `docs/MORNING-RITUAL.md` |
 | Evening ritual 5′ | PASS | D-B9-EVENING-RITUAL · `docs/EVENING-RITUAL.md` |
+| Weekly security sweep | PASS | D-B9-WEEKLY-SECURITY-SWEEP · `.github/workflows/weekly-security-sweep.yml` |
+| Grok Bot PM | PARKED | Optional until status noise proves need; BADACZ + daily digest cover current loop |
 
-**F4 verdict:** **PARTIAL PASS** (core autonomia bez Slack). Next: Batch 9 rituals.
+**F4 verdict:** **CORE PASS** (autonomy loop complete without Slack). Slack and Grok PM remain parked optional optimizations, not blockers.
 
 ## F2 exit — Memory AI (master plan §5 Faza 2)
 
