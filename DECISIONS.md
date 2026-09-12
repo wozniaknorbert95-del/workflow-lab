@@ -2,19 +2,23 @@
 
 One page. Newest first. Every irreversible choice lives here.
 
-## D-W5-CLOUD (2026-09-12) — W-05 BLOCKED on Cursor checkout/build
+## D-W5-CLOUD (2026-09-12) — W-05 BLOCKED on GitHub-issue @cursor checkout
 
-**Status:** FAIL (not PASS). Cloud Agent cannot open a `cursor/*` PR.
+**Status:** FAIL (not PASS). Cloud Agent cannot open a `cursor/*` PR from GitHub issue #5.
 
-**Symptom:** every `@cursor` on GitHub issue #5 ends with `Couldn't check out the repository` (cursor[bot]). Agent workspace may edit files locally (`Worked`) but Git panel shows **No pushed changes** — 0 open PRs.
+**Symptom:** every `@cursor` on issue #5 ends in ~5s with `Couldn't check out the repository` (cursor[bot]). 0 open PRs.
 
-**Retries (issue #5):** #6 `bc-86e070d2` · #7 `bc-c6bd0185` · #8 `bc-787c46b3` · #9 after env fix — all checkout FAIL. Earlier: billing block (retries #3–#5, fixed via On-Demand Unlimited + github-bg-connected **Setup complete**).
+**Retries (issue #5):** #6–#9 · #10 (post reinstall) · #11 (post PR #10 + OAuth) · #12 (post env clone OK) — all checkout FAIL. Latest: **`bc-3f35426d`** (#12, 2026-09-12 11:45 UTC).
 
-**Environment:** `6d364999-ae9a-11f1-bf4b-42ffb4d10ea7` — **0 successful builds** (all Manual/Recurring **Failure**, mostly Draft). Dashboard still shows Install Script **Not defined** despite PR #8.
+**Split root cause (2026-09-12 13:42+):**
+- **Environment build clone:** OK — `bld-7ee8ac2a` cloned `workflow-lab` @ `d767abe` ([build log](https://cursor.com/dashboard/cloud-agents/builds/bld-20260912-7ee8ac2a-c9da-4b51-9690-2ef8fe2778ad)). Docker step then **Terminal failure** (Cursor infra).
+- **GitHub issue @cursor:** still FAIL checkout — uses **background-agent** path, not environment build path.
+- **Integrations GitHub:** shows *Connect as wozniaknorbert95-del to 1 organization* (GitLab shows *Connected as*). Likely missing org OAuth link.
+- **github-bg-connected:** *Setup complete* (Connect GitHub ✓).
 
-**Infra fixes applied (staff, not W-05 test):** repo visibility → **public** (D-W01-PUBLIC) · PR #8 env.json install script · GitHub App **All repositories** · `workflow-lab` confirmed in Cursor installation API (107664687).
+**Infra applied (staff, not W-05 test):** App reinstall **161116895** (All repos) · [PR #10](https://github.com/wozniaknorbert95-del/workflow-lab/pull/10) dockerfile `.cursor/Dockerfile` · dashboard install script `npm run lint && npm test`.
 
-**Single fix (Commander):** GitHub → Applications → Cursor → **Uninstall** → reinstall → **All repositories** → cursor.com/github-bg-connected **Connect GitHub** → Cloud Agents → delete `workflow-lab` environment → **Trigger New Build** (non-draft) until **Success** → `@cursor` retry on #5 → merge PR (human). If still FAIL: Cursor support with agent id `bc-787c46b3`.
+**Single fix (Commander — human OAuth):** [Integrations → Source Control → GitHub](https://cursor.com/dashboard/integrations?highlight=source-control) → complete **Connect to organization `wozniaknorbert95-del`** (OAuth popup; Reconnect alone insufficient). Then `@cursor` #13 on issue #5 → merge PR. If still FAIL: Cursor support — agent `bc-3f35426d`, install `161116895`, note env clone OK but @cursor checkout FAIL.
 
 **Forbidden:** implementing `greet("Cloud")` on laptop to fake W-05.
 
