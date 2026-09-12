@@ -72,6 +72,18 @@ const httpsCa = caExists
 debugLog("H2", "https probe github.com", { httpsDefault, httpsCa });
 // #endregion
 
+let curlProbe = { ok: false, error: "curl-not-run" };
+try {
+  execFileSync("curl", ["--version"], { encoding: "utf8", timeout: 5000 });
+  curlProbe = { ok: true };
+} catch (err) {
+  curlProbe = { ok: false, error: err.message?.split("\n")[0] ?? String(err) };
+}
+
+// #region agent log
+debugLog("H5", "curl availability", curlProbe);
+// #endregion
+
 let gitProbe = { ok: false, error: "git-not-run" };
 try {
   const out = execFileSync(
@@ -89,11 +101,14 @@ debugLog("H3", "git ls-remote workflow-lab", gitProbe);
 // #endregion
 
 const isLinux = process.platform === "linux";
-const healthy = (!isLinux || caExists) && httpsDefault.ok && gitProbe.ok;
-console.log(JSON.stringify({ healthy, caExists, httpsDefault, httpsCa, gitProbe }, null, 2));
+const healthy =
+  (!isLinux || caExists) && curlProbe.ok && httpsDefault.ok && gitProbe.ok;
+console.log(
+  JSON.stringify({ healthy, caExists, curlProbe, httpsDefault, httpsCa, gitProbe }, null, 2),
+);
 
 // #region agent log
-debugLog("H4", "diag summary", { healthy, caExists, gitOk: gitProbe.ok });
+debugLog("H4", "diag summary", { healthy, caExists, curlOk: curlProbe.ok, gitOk: gitProbe.ok });
 // #endregion
 
 if (!healthy) {
