@@ -4,7 +4,7 @@
     "dockerfile": ".cursor/Dockerfile",
     "context": "."
   },
-  "install": "npm run lint && npm test",
+  "install": "node scripts/cloud-env-diag.js && npm run lint && npm test",
   "terminals": [
     { "name": "dev", "command": "node src/hello.js" }
   ]
