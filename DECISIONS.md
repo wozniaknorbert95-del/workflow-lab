@@ -2,6 +2,16 @@
 
 One page. Newest first. Every irreversible choice lives here.
 
+## D-B9-EVENING-RITUAL (2026-09-12) — B9-T3 evening ritual PASS
+
+**Decision:** The evening ritual is a 5-minute shutdown checklist. The SSoT is `docs/EVENING-RITUAL.md`, linked from `README.md`.
+
+**Source:** `workflow-marzen/04-INSTRUKCJA-OBSUGI.md` §2: each MR is merged, commented, or closed; Linear is updated with facts; tomorrow starts from one written sentence.
+
+**Rules:** Do not start new coding, do not merge with red/unknown CI, do not deploy, and do not make spending decisions during this ritual.
+
+**Evidence:** `docs/EVENING-RITUAL.md`, `README.md`, `docs/BATCH-09.md`.
+
 ## D-B9-MORNING-RITUAL (2026-09-12) — B9-T2 morning ritual PASS
 
 **Decision:** The morning ritual is a 10-minute operational checklist, not another dashboard. The SSoT is `docs/MORNING-RITUAL.md`, linked from `README.md`.
