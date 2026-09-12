@@ -2,6 +2,16 @@
 
 One page. Newest first. Every irreversible choice lives here.
 
+## D-W3-COST (2026-09-12) — F3 Cloud Agent cost baseline (Batch 1)
+
+| Run | Agent | PR | CI run | $ marginal |
+|-----|-------|-----|--------|------------|
+| W-05 | `bc-c187d412` | [#14](https://github.com/wozniaknorbert95-del/workflow-lab/pull/14) | [34693117577](https://github.com/wozniaknorbert95-del/workflow-lab/actions/runs/34693117577) | $0 (included Pro+) |
+| CA-1 | pending | issue [#2](https://github.com/wozniaknorbert95-del/workflow-lab/issues/2) | — | — |
+| CA-3 | pending | issue [#4](https://github.com/wozniaknorbert95-del/workflow-lab/issues/4) | — | — |
+
+**Plan:** `docs/ROADMAP-MASTER.md` · current batch `docs/BATCH-01.md`.
+
 ## D-W9-USAGE (2026-09-12) — first Cloud Agent delivery cost baseline
 
 **Plan:** Pro+ · On-Demand Unlimited enabled.
