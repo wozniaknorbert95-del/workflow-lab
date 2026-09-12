@@ -2,6 +2,18 @@
 
 One page. Newest first. Every irreversible choice lives here.
 
+## D-F3-EXIT (2026-09-12) — Faza 3 Cloud Agents closed (Batch 03)
+
+**Verdict:** PASS with Bugbot comment PARTIAL.
+
+**Smoke (post-OAuth auto-PR):** Issue #23 → agent `bc-fc7682c1` → [PR #25](https://github.com/wozniaknorbert95-del/workflow-lab/pull/25) `TESTING.md` — **first MR auto-opened by Cloud Agent** without `gh` fallback. Merged `4089638`.
+
+**Cloud MR scorecard:** #14 (W-05), #19 (CA-1), #20 (CA-3), #25 (F3 smoke) — 4/4 code merged without manual fixes.
+
+**Bugbot:** enabled in Integrations API; zero PR comments on lab MRs to date → Batch 4 B4-T5.
+
+**Cost:** `D-W3-COST` — $0 marginal per MR on Pro+ included quota.
+
 ## D-W3-GITHUB-OAUTH (2026-09-12) — stale OAuth fix (Integrations Connect)
 
 **Symptom:** Integrations → GitHub → *Failed to load GitHub settings*; `POST /api/dashboard/get-github-installations` → **500 internal error**. Cloud Agent git worked (App 161116895) but auto-PR/Bugbot failed.

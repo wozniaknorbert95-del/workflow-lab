@@ -4,7 +4,21 @@ PASS only with evidence (PR URL, API response, or `DECISIONS.md` line). Do not m
 
 **Fully working** = W-01..W-05 + W-07 + W-08 PASS — **ACHIEVED 2026-09-12** (plan W-05 close). W-06 (phone) = next checkpoint after Linear mobile.
 
-Updated: 2026-09-12 (plan closed — W-01 protection on, W-05/W-09 evidence; `DECISIONS.md`).
+Updated: 2026-09-12 (F3 exit scorecard added; Batch 03 closed; `DECISIONS.md` D-F3-EXIT).
+
+## F3 exit — Cloud Agents (master plan §5 Faza 3)
+
+| Criterion | Status | Evidence |
+| --- | --- | --- |
+| Green Cloud Build + `environment.json` | PASS | `.cursor/Dockerfile` (#12 ca-cert, #13 curl); build green post-fix |
+| ≥3 Cloud Agent MRs | PASS | #14 W-05, #19 CA-1, #20 CA-3, #25 smoke — 4 total |
+| Auto-PR post-OAuth (no `gh` fallback) | PASS | #25 agent `bc-fc7682c1`, branch `cursor/testing-md-0a8e` |
+| ≥2/3 MR merged without manual code fixes | PASS | 4/4 agent code merged as-is (W-05 PR opened via `gh`, code untouched) |
+| Bugbot enabled | PASS | API `bugBotEnabled: true` (`D-W3-GITHUB-OAUTH`) |
+| Bugbot comment on MR | PARTIAL | No comments yet — carry to Batch 4 |
+| `$/MR` recorded | PASS | `DECISIONS.md` D-W3-COST — $0 marginal (Pro+ included) |
+
+**F3 verdict:** **PASS with one PARTIAL** (Bugbot comment deferred). Next: F2 memory AI (Batch 4).
 
 ## Scoreboard
 
