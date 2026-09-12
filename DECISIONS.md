@@ -2,6 +2,62 @@
 
 One page. Newest first. Every irreversible choice lives here.
 
+## D-B8-AUTOMATION (2026-09-12) — B8-T3 Automation PASS
+
+**Automation:** [workflow-lab: agent issue → Cloud Agent](https://cursor.com/automations/64ead0a5-aeb1-11f1-bf4b-42ffb4d10ea7) — **enabled**.
+
+**Trigger (actual UI):** GitHub **Any Comment** on `workflow-lab` (not Issue opened — Cursor UI limitation). Smoke: comment on [#38](https://github.com/wozniaknorbert95-del/workflow-lab/issues/38#issuecomment-5646344422) → Run History **Running** → agent `bc-9172fb9e` → [PR #40](https://github.com/wozniaknorbert95-del/workflow-lab/pull/40) (author `app/cursor`), CI `validate` SUCCESS.
+
+**Workflow:** Issue with label `agent` + **one comment** (no `@cursor` needed) starts Cloud Agent. Open Pull Request tool enabled.
+
+**Evidence:** `docs/evidence/b8-t3-automation-running.png` · prompt `docs/AUTOMATION-B8-T3.md`
+
+## D-F4-SLACK-PARK (2026-09-12) — Slack odłożony (Batch 8 scope cut)
+
+**Decyzja Dowódcy:** Slack **nie** podpinamy w tej fazie. Uznany za zbędny — Linear mobile + GitHub mobile + Cursor wystarczą.
+
+**Plan impact:** Faza 4 master planu — punkt „SLACK podpięty” → **PARKED** do przyszłej sesji. Nie blokuje W-06 PASS ani Batch 8.
+
+**Zamienniki:** Linear notyfikacje, GitHub mobile, Grok Bot PM (B8-T5), Automations na eventach GitHub.
+
+**Revisit:** gdy pojawi się potrzeba kanału gaduły dla zespołu >1 osoba lub zewnętrznych integracji.
+
+## D-W6-PHONE (2026-09-12) — W-06 PASS (phone loop closed)
+
+**Verdict:** PASS. Full loop from phone without laptop.
+
+**Flow:**
+1. Linear mobile — [QUI-10](https://linear.app/quietforge/issue/QUI-10/w-06-phone-loop-batch-7) (In Progress, delegate Cursor)
+2. `@cursor` trigger → Cloud Agent `bc-2aeab115` → branch `cursor/w6-phone-loop-4fbb`
+3. [PR #34](https://github.com/wozniaknorbert95-del/workflow-lab/pull/34) auto-opened, CI `validate` SUCCESS
+4. **GitHub mobile squash merge** by Commander `2026-09-12T13:43:06Z` → `b8e261a`
+
+**Deliverable:** README line `Mobile loop (W-06): verified 2026-09-12 from phone.`
+
+**GitHub issue:** #32 closed by PR #34.
+
+## D-W3-BUGBOT (2026-09-12) — Bugbot UI root cause (Batch 5 B5-T2)
+
+**Finding:** Integrations API showed `bugBotEnabled: true` for `workflow-lab`, but **Automations → Bugbot** had global **Enable Bugbot OFF** and coverage **0/0 enabled (0%)** for `wozniaknorbert95-del` GitHub.
+
+**URL:** https://cursor.com/automations/from-cursor/bugbot
+
+**Why zero PR comments:** Bugbot never ran — not a repo-config bug; global automation disabled + onboarding not completed.
+
+**Human-stop:** Enabling Bugbot requires **Usage-Based Billing** modal (~**$1.20/review** estimated). Commander must click **Enable Usage-Based Billing** at own risk/budget.
+
+**Evidence:** `docs/evidence/b5-t2-bugbot-before.png`, `docs/evidence/b5-t2-bugbot-billing-gate.png`
+
+**Rekomendacja R1:** Accept spend for lab smoke (1–2 PRs) OR defer Bugbot comment gate and proceed W-06 (Batch 7) — Bugbot nie blokuje phone loop.
+
+## D-W6-SETUP (2026-09-12) — W-06 issue + runbook (Batch 7 B7-T0)
+
+**Status:** SETUP PASS. Execution = Commander phone (human-stop merge).
+
+**Issue:** [#32](https://github.com/wozniaknorbert95-del/workflow-lab/issues/32) — Linear mobile → Cloud Agent → GitHub mobile merge.
+
+**Runbook:** `docs/W6-PHONE-LOOP.md` · tracker `docs/BATCH-07.md`.
+
 ## D-F2-EXIT (2026-09-12) — Faza 2 Memory AI closed (Batch 04)
 
 **Verdict:** PASS.

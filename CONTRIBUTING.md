@@ -5,6 +5,7 @@
 3. `npm run lint && npm test && npm run build` (same as CI; there is no typecheck).
 4. Open a PR linking `Closes #N`.
 5. Wait for green CI. **A human merges.** Agents never merge.
+- **Automation (B8-T3):** verified 2026-09-12 — GitHub `agent` label triggers Cloud Agent.
 
 This gym is not `dsaas-platform-main` and not the Academy. Do not mix.
 

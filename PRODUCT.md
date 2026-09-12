@@ -22,7 +22,7 @@ Tracked in `docs/DOD-WORKFLOW.md`. Current state (2026-09-12):
 | W-05 Cloud Agent MR | PASS | Agent opens PR, CI green, human merges |
 | F3 Cloud wave | PASS | ≥3 cloud MRs, auto-PR post-OAuth (#25), `$/MR` recorded |
 | F2 Memory AI | IN PROGRESS | Docs + skills so agents ask zero convention questions |
-| W-06 Phone loop | FAIL | Linear mobile → Cloud → GitHub mobile merge (Batch 7) |
+| W-06 Phone loop | **PASS** | QUI-10 → PR #34 → mobile merge `b8e261a` (2026-09-12) |
 
 **Product win for F2:** a new agent reads `ARCHITECTURE.md` + `PRODUCT.md` + `TESTING.md` and completes a size-S issue without asking where tests live or which commands CI runs.
 
