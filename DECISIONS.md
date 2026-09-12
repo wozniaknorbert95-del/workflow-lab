@@ -2,25 +2,22 @@
 
 One page. Newest first. Every irreversible choice lives here.
 
-## D-W5-CLOUD (2026-09-12) — W-05 BLOCKED on GitHub-issue @cursor checkout
+## D-W5-CLOUD (2026-09-12) — W-05 PASS (Cloud Agent loop closed)
 
-**Status:** FAIL (not PASS). Cloud Agent cannot open a `cursor/*` PR from GitHub issue #5.
+**Status:** PASS. Cloud Agent delivered W-05 test; human merged PR #14.
 
-**Symptom:** every `@cursor` on issue #5 ends in ~5s with `Couldn't check out the repository` (cursor[bot]). 0 open PRs.
+**Deliverable:** [PR #14](https://github.com/wozniaknorbert95-del/workflow-lab/pull/14) — `greet("Cloud") === "hello Cloud"` in `src/hello.test.js` only. CI `validate` SUCCESS. Squash-merged `8239f41` 2026-09-12.
 
-**Retries (issue #5):** #6–#9 · #10 (post reinstall) · #11 (post PR #10 + OAuth) · #12 (post env clone OK) — all checkout FAIL. Latest: **`bc-3f35426d`** (#12, 2026-09-12 11:45 UTC).
+**Agent:** `bc-c187d412` (@cursor retry #15 on issue #5). Branch `cursor/greet-cloud-test-bfd7` (`c3feca9`). PR opened via `gh` fallback — agent `ManagePullRequest` failed (*connected GitHub account cannot access this repository*); code delivery intact.
 
-**Split root cause (2026-09-12 13:42+):**
-- **Environment build clone:** OK — `bld-7ee8ac2a` cloned `workflow-lab` @ `d767abe` ([build log](https://cursor.com/dashboard/cloud-agents/builds/bld-20260912-7ee8ac2a-c9da-4b51-9690-2ef8fe2778ad)). Docker step then **Terminal failure** (Cursor infra).
-- **GitHub issue @cursor:** still FAIL checkout — uses **background-agent** path, not environment build path.
-- **Integrations GitHub:** shows *Connect as wozniaknorbert95-del to 1 organization* (GitLab shows *Connected as*). Likely missing org OAuth link.
-- **github-bg-connected:** *Setup complete* (Connect GitHub ✓).
+**Root causes fixed (infra, staff PRs — not W-05 test code):**
+1. **SSL clone fail** — build `bld-1310fd83`: `CAfile: none` → [PR #12](https://github.com/wozniaknorbert95-del/workflow-lab/pull/12) `ca-certificates` + `GIT_SSL_CAINFO` in `.cursor/Dockerfile`.
+2. **exec-daemon fail** — agent `bc-86a1db80`: `curl: command not found` → [PR #13](https://github.com/wozniaknorbert95-del/workflow-lab/pull/13) add `curl` to Dockerfile.
+3. **PR API OAuth** — optional follow-up: [Integrations → GitHub](https://cursor.com/dashboard/integrations?highlight=source-control) org connect for auto-PR.
 
-**Infra applied (staff, not W-05 test):** App reinstall **161116895** (All repos) · [PR #10](https://github.com/wozniaknorbert95-del/workflow-lab/pull/10) dockerfile `.cursor/Dockerfile` · dashboard install script `npm run lint && npm test`.
+**Prior failures (historical):** retries #6–#14 checkout FAIL until #12+#13 merged; App reinstall **161116895** (All repos); [PR #10](https://github.com/wozniaknorbert95-del/workflow-lab/pull/10) dockerfile path fix.
 
-**Single fix (Commander — human OAuth):** [Integrations → Source Control → GitHub](https://cursor.com/dashboard/integrations?highlight=source-control) → complete **Connect to organization `wozniaknorbert95-del`** (OAuth popup; Reconnect alone insufficient). Then `@cursor` #13 on issue #5 → merge PR. If still FAIL: Cursor support — agent `bc-3f35426d`, install `161116895`, note env clone OK but @cursor checkout FAIL.
-
-**Forbidden:** implementing `greet("Cloud")` on laptop to fake W-05.
+**Forbidden (held):** implementing `greet("Cloud")` on laptop to fake W-05 — test came from Cloud Agent branch only.
 
 ## D-W01-PUBLIC (2026-09-12) — lab repo public for Cloud + protection path
 
