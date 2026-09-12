@@ -1,10 +1,10 @@
 # Batch 09 — F4 rytuały + digest
 
-**Started:** pending · **Plan ref:** master F4 §174-179 · `04-INSTRUKCJA-OBSUGI.md`
+**Started:** 2026-09-12 · **Plan ref:** master F4 §174-179 · `04-INSTRUKCJA-OBSUGI.md`
 
 | ID | Task | Status | Evidence |
 |----|------|--------|----------|
-| B9-T1 | Automation: daily digest (07:30) | PENDING | `docs/W4-AUTOMATIONS.md` Automation 1 |
+| B9-T1 | Automation: daily digest (07:30) | **PASS** | Cursor Automation `d968fd5d-aeb5-11f1-bf4b-42ffb4d10ea7` + GitHub issue [#44](https://github.com/wozniaknorbert95-del/workflow-lab/issues/44) smoke |
 | B9-T2 | Rytuał poranny 10′ — checklist w README/DECISIONS | PENDING | Handbook §2 |
 | B9-T3 | Rytuał wieczorny 5′ | PENDING | Handbook §2 |
 | B9-T4 | Grok Bot PM (optional) | PENDING | `docs/grok-bots/PM.md` |
@@ -12,4 +12,4 @@
 
 **Prerequisite:** Batch 8 CLOSED (F4 partial PASS) ✅
 
-**Next action:** B9-T1 daily digest automation (GitHub/Linear event, no Slack)
+**Next action:** B9-T2 morning ritual checklist (10′)

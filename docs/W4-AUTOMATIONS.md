@@ -11,6 +11,16 @@ Trigger: cron 07:30 Europe/Warsaw.
 Action: comment on Linear project `workflow-lab` (or GitHub tracking issue) with: open `agent` issues, PRs waiting review, CI red.
 Do not post secrets. Do not mention dsaas ENT-*.
 
+**Implemented (B9-T1, 2026-09-12):**
+
+- Cursor Automation: `workflow-lab: daily digest 07:30`
+- Automation ID: `d968fd5d-aeb5-11f1-bf4b-42ffb4d10ea7`
+- Cursor schedule shown in UI: **Every day at 07:30**
+- Stored cron: `30 5 * * *` UTC (07:30 Europe/Warsaw during CEST)
+- Durable output path: GitHub issue [#44](https://github.com/wozniaknorbert95-del/workflow-lab/issues/44)
+- Reliable posting mechanism: `.github/workflows/daily-digest.yml` → `scripts/daily-digest.mjs`
+- Smoke: final comment on #44 shows `Open agent issues: 0`, `PRs waiting review/merge: 0`, `CI red: 0`
+
 ## Automation 2 — weekly security sweep (Monday)
 
 Trigger: weekly.

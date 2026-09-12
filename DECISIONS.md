@@ -2,6 +2,18 @@
 
 One page. Newest first. Every irreversible choice lives here.
 
+## D-B9-DAILY-DIGEST (2026-09-12) — B9-T1 daily digest PASS
+
+**Decision:** B9-T1 uses both Cursor Automation and a GitHub Actions workflow. Cursor Automation is the visible scheduled agent (`workflow-lab: daily digest 07:30`); GitHub Actions is the reliable writer to GitHub issue [#44](https://github.com/wozniaknorbert95-del/workflow-lab/issues/44).
+
+**Why:** Cursor Automation test run succeeded, but Run History showed `Tools: —` and did not post a GitHub issue comment. GitHub Actions with `GITHUB_TOKEN` can safely comment on the tracking issue without Slack or external secrets.
+
+**Schedule:** Cursor UI shows **Every day at 07:30**. Stored cron is `30 5 * * *` UTC for 07:30 Europe/Warsaw during CEST.
+
+**Implementation:** `.github/workflows/daily-digest.yml` runs `scripts/daily-digest.mjs`, posting open `agent` issues, open PRs, red CI, and one next action to issue #44. The script excludes the tracking issue itself from `agent` issue counts.
+
+**Evidence:** Cursor config screenshot `docs/evidence/b9-t1-cursor-automation-config.png`; Cursor run history screenshot `docs/evidence/b9-t1-cursor-automation-run-succeeded.png`; final smoke comment [#44](https://github.com/wozniaknorbert95-del/workflow-lab/issues/44#issuecomment-5646537349); screenshot `docs/evidence/b9-t1-digest-issue-smoke.png`; smoke report `docs/evidence/b9-t1-daily-digest-smoke.md`.
+
 ## D-B8-GROK-BADACZ (2026-09-12) — B8-T4 Grok Bot BADACZ PASS
 
 **Bot:** `BADACZ` in Grok Bot desktop **v0.44.0** (signed in, Cursor Pro+).
