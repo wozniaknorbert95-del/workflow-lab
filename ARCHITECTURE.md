@@ -1,33 +1,79 @@
 # ARCHITECTURE.md — workflow-lab
 
-One page.
+One page. Read this + `AGENTS.md` §2 before touching code.
 
 ## What this is
 
-A tiny Node 20 ESM package used to **train the delivery loop**, not to ship a product.
+A **Node 20 ESM gym** for the Workflow Marzeń delivery loop — not a product, not the DSaaS platform.
 
 ```
-issue (Linear or GitHub 6-field template)
+Linear / GitHub issue (6-field template)
   → branch feat|fix|chore
   → npm run lint && npm test && npm run build
-  → MR/PR
-  → CI (same three commands)
-  → human merge
+  → PR (human opens or Cloud Agent auto-PR)
+  → CI validate (same three commands)
+  → human merge → DECISIONS.md if irreversible
 ```
 
-## Runtime
+## Directory map
 
-- No HTTP server, no database, no Docker Compose for the app.
-- Library: `src/hello.js` exports `greet(name = "workflow-lab")`.
-- Tests: `src/hello.test.js` via `node:test`.
-- Build: `scripts/build.js` copies `src/*.js` (not tests) into `dist/`.
+| Path | Role |
+| --- | --- |
+| `src/hello.js` | Only library export: `greet(name?)` |
+| `src/hello.test.js` | Contract tests (`node:test`) — see `TESTING.md` |
+| `scripts/build.js` | Copies `src/*.js` (not tests) → `dist/` |
+| `scripts/cloud-env-diag.js` | Cloud Build smoke (TLS, curl, git) |
+| `.github/workflows/ci.yml` | GitHub CI — **must match** `AGENTS.md` §2 |
+| `.gitlab-ci.yml` | GitLab CE mirror (same commands, future F0) |
+| `.cursor/Dockerfile` | Cloud Agent image: node:20 + ca-certificates + curl |
+| `.cursor/environment.json` | Cloud install + `dev` terminal |
+| `.cursor/skills/` | Repeatable procedures for agents |
+| `.cursor/rules/` | Polish guardrails; **AGENTS.md wins** on conflict |
+| `docs/DOD-WORKFLOW.md` | Scoreboard W-01..W-10 |
+| `DECISIONS.md` | Irreversible choices (newest first) |
 
-## CI parity
+## Runtime layer
 
-GitHub Actions `.github/workflows/ci.yml` and GitLab `.gitlab-ci.yml` run **exactly** the commands in `AGENTS.md` §2. No extra tools.
+- **No** HTTP server, database, Docker Compose app, or npm dependencies.
+- `greet(name = "workflow-lab")` — trims input; empty/whitespace → `TypeError`.
+- CLI: `node src/hello.js` prints default greeting (Cloud `dev` terminal).
+- Build output: `dist/hello.js` (artifact only; tests never copied).
+
+## CI parity rule
+
+Single source of truth: `package.json` scripts.
+
+```
+lint:  node --check on src/*.js + scripts/build.js
+test:  node --test src/hello.test.js
+build: node scripts/build.js
+```
+
+GitHub `validate` job and GitLab `lint`/`unit-tests`/`build` stages run **exactly** these. Do not add tools without updating all three surfaces.
+
+## Cloud Agent layer
+
+Cloud Agents clone via GitHub App, build `.cursor/Dockerfile`, run in isolated VM.
+
+- Infra fixes: PR #12 (ca-certificates), #13 (curl) — required for checkout/exec.
+- OAuth auto-PR: Integrations User OAuth (separate from GitHub App) — see `D-W3-GITHUB-OAUTH`.
+- Evidence: agent ID + PR URL in `DECISIONS.md` / `docs/DOD-WORKFLOW.md`.
+
+## Three architectural decisions
+
+1. **Zero npm deps** — fresh clone + Node 20 = works. Trade-off: no eslint/jest; use `node --check` + `node:test`.
+2. **Single origin GitHub** — lab SoT is `wozniaknorbert95-del/workflow-lab`. GitLab CE is future cutover (F0), not dual-origin.
+3. **Human merge only** — agents open PRs; Commander merges after CI + review. No auto-merge to `main`.
+
+## Where to add [example feature]
+
+| Change type | Where |
+| --- | --- |
+| New `greet` behaviour | `src/hello.js` + regression test in `src/hello.test.js` + row in `TESTING.md` |
+| New npm script | `package.json` + `AGENTS.md` §2 + CI yaml(s) — use skill `dodaj-script` |
+| New test file | `src/*.test.js` + wire in `package.json` `test` — use skill `dodaj-test` |
+| Cloud/env change | `.cursor/Dockerfile` or `environment.json` + `DECISIONS.md` entry |
 
 ## What is not here
 
-- QuietForge Kokpit, ontologies, OPA, MCP.
-- Academy lessons (`DASHBOARD.html`).
-- Secrets, `.env` values, deploy to VPS.
+QuietForge Kokpit, ontologies, OPA, MCP runtime, tenant data, Academy lessons, production deploy of DSaaS.

@@ -51,6 +51,7 @@ There is no `typecheck` script. Do not invent one.
 - `src/hello.test.js` — contract tests.
 - `scripts/build.js` — copies `src/` → `dist/`.
 - Details: `ARCHITECTURE.md`. Product intent: `PRODUCT.md`. History: `DECISIONS.md`.
+- Skills: `.cursor/skills/` — `dodaj-test`, `dodaj-script`, `review-bezpieczenstwa`.
 
 ## 4. Conventions
 
