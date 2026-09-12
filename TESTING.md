@@ -27,6 +27,7 @@ There is no `typecheck`. Do not invent one.
 | Happy path | `greet()` | `hello workflow-lab` |
 | Trim | `greet("  lab  ")` | `hello lab` |
 | Empty | `greet("  ")` | throws `TypeError` |
+| Non-string | `greet(123)` | throws `TypeError` |
 | Cloud | `greet("Cloud")` | `hello Cloud` |
 
 ## Rules
