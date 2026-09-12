@@ -10,6 +10,7 @@ Gym for the Workflow Marzeń loop. **Not** the QuietForge platform. **Not** the 
 - Linear CO: `docs/LINEAR.md` → D-W3-LINEAR
 - DoD scoreboard: `docs/DOD-WORKFLOW.md`
 - CE install (Commander only): `docs/W0-GITLAB-CE-CHECKLIST.md`
+- Morning ritual: `docs/MORNING-RITUAL.md` (10 minutes after daily digest)
 
 ## Komendy
 
