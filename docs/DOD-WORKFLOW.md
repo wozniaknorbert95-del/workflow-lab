@@ -25,6 +25,6 @@ Updated: 2026-09-12 (W-05 PASS — PR #14 merged; see `DECISIONS.md` D-W5-CLOUD)
 
 - W-01 remainder: enable classic branch protection on public repo (require PR + required check `validate`).
 - W-03: done. Live URLs in `docs/LINEAR.md`.
-- W-05: done (PR #14). Optional: fix Cursor OAuth for auto-PR creation (agent used `gh` fallback).
+- W-05: done (PR #14). Cursor org OAuth `wozniaknorbert95-del` connected 2026-09-12 (`DECISIONS.md` D-W5-CLOUD §3).
 - W-06: after W-03 and W-05.
 - W-09: one line in `DECISIONS.md` after the first billed cloud run.
