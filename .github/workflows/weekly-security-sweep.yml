@@ -1,0 +1,25 @@
+name: weekly-security-sweep
+
+on:
+  schedule:
+    # 07:00 Europe/Warsaw during CEST. GitHub schedules are UTC.
+    - cron: "0 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  open-sweep-issue:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Open weekly security sweep issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          POST_ISSUE: "true"
+        run: node scripts/weekly-security-sweep.mjs

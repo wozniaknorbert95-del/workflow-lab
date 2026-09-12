@@ -2,6 +2,16 @@
 
 One page. Newest first. Every irreversible choice lives here.
 
+## D-B9-WEEKLY-SECURITY-SWEEP (2026-09-12) — B9-T5 weekly security sweep PASS
+
+**Decision:** Weekly security sweep is a GitHub Actions issue opener, not a secret-bearing external automation. The SSoT is `.github/workflows/weekly-security-sweep.yml` running `scripts/weekly-security-sweep.mjs`.
+
+**Schedule:** Mondays at `0 5 * * 1` UTC, matching the morning workflow window during Europe/Warsaw CEST. Manual smoke uses `workflow_dispatch`.
+
+**Rules:** The action creates at most one open issue per ISO week, titled `chore: weekly security sweep <YYYY-Www>`, labeled `agent`. Body instructs the agent to run skill `review-bezpieczenstwa` on `main` since last sweep and return `PASS: clean` or exact blockers. No secrets, no dsaas work, no code execution outside this lab.
+
+**Evidence:** `.github/workflows/weekly-security-sweep.yml`, `scripts/weekly-security-sweep.mjs`, `docs/W4-AUTOMATIONS.md`, `docs/BATCH-09.md`.
+
 ## D-B9-EVENING-RITUAL (2026-09-12) — B9-T3 evening ritual PASS
 
 **Decision:** The evening ritual is a 5-minute shutdown checklist. The SSoT is `docs/EVENING-RITUAL.md`, linked from `README.md`.

@@ -12,6 +12,7 @@ Gym for the Workflow Marzeń loop. **Not** the QuietForge platform. **Not** the 
 - CE install (Commander only): `docs/W0-GITLAB-CE-CHECKLIST.md`
 - Morning ritual: `docs/MORNING-RITUAL.md` (10 minutes after daily digest)
 - Evening ritual: `docs/EVENING-RITUAL.md` (5-minute shutdown checklist)
+- Weekly security sweep: `.github/workflows/weekly-security-sweep.yml` → `agent` issue
 
 ## Komendy
 
