@@ -11,6 +11,7 @@ Gym for the Workflow Marzeń loop. **Not** the QuietForge platform. **Not** the 
 - DoD scoreboard: `docs/DOD-WORKFLOW.md`
 - CE install (Commander only): `docs/W0-GITLAB-CE-CHECKLIST.md`
 - Morning ritual: `docs/MORNING-RITUAL.md` (10 minutes after daily digest)
+- Evening ritual: `docs/EVENING-RITUAL.md` (5-minute shutdown checklist)
 
 ## Komendy
 
