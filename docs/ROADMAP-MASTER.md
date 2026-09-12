@@ -1,6 +1,6 @@
 # Roadmap master — Workflow Marzeń (15×5)
 
-**Source:** `workflow-marzen/00-PLAN-DZIALANIA.md` · **Lab scoreboard:** `DOD-WORKFLOW.md`  
+**Source:** `akademia/ops/workflow-marzen/00-PLAN-DZIALANIA.md` (kanon; kopia `github/workflow-marzen/` jest robocza, nie SSoT) · **Lab scoreboard:** `DOD-WORKFLOW.md`  
 **Rule:** each batch = 5 tasks → verify gates → next batch. Human-stop = Dowódca only where marked.
 
 **Current batch:** [BATCH-09.md](./BATCH-09.md) · **Status:** CLOSED (F4 core PASS; Slack + Grok PM parked optional)
