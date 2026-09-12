@@ -13,7 +13,7 @@ One page. Newest first. Every irreversible choice lives here.
 **Root causes fixed (infra, staff PRs — not W-05 test code):**
 1. **SSL clone fail** — build `bld-1310fd83`: `CAfile: none` → [PR #12](https://github.com/wozniaknorbert95-del/workflow-lab/pull/12) `ca-certificates` + `GIT_SSL_CAINFO` in `.cursor/Dockerfile`.
 2. **exec-daemon fail** — agent `bc-86a1db80`: `curl: command not found` → [PR #13](https://github.com/wozniaknorbert95-del/workflow-lab/pull/13) add `curl` to Dockerfile.
-3. **PR API OAuth** — optional follow-up: [Integrations → GitHub](https://cursor.com/dashboard/integrations?highlight=source-control) org connect for auto-PR.
+3. **PR API OAuth** — **resolved 2026-09-12:** Commander connected Cursor to org **`wozniaknorbert95-del`** ([Integrations → GitHub](https://cursor.com/dashboard/integrations?highlight=source-control)). W-05 used `gh` fallback before this; next `@cursor` run should auto-open PRs.
 
 **Prior failures (historical):** retries #6–#14 checkout FAIL until #12+#13 merged; App reinstall **161116895** (All repos); [PR #10](https://github.com/wozniaknorbert95-del/workflow-lab/pull/10) dockerfile path fix.
 
