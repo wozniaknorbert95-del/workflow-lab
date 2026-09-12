@@ -1,0 +1,33 @@
+stages:
+  - validate
+  - test
+  - build
+
+lint:
+  stage: validate
+  image: node:20
+  interruptible: true
+  script:
+    - npm run lint
+
+unit-tests:
+  stage: test
+  image: node:20
+  interruptible: true
+  script:
+    - npm test
+
+build:
+  stage: build
+  image: node:20
+  script:
+    - npm run build
+  artifacts:
+    paths:
+      - dist/
+    expire_in: 1 day
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
