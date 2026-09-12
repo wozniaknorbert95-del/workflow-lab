@@ -1,0 +1,16 @@
+---
+description: Żelazne zasady pracy w tym repo — obowiązują zawsze
+globs:
+alwaysApply: true
+---
+
+# Fundament (obowiązuje zawsze)
+
+- Odpowiadaj po polsku. Kod, komentarze i commity — zgodnie z AGENTS.md (English).
+- Zanim cokolwiek zmienisz: przeczytaj AGENTS.md.
+- Pracuj wyłącznie na plikach związanych z zadaniem. Nic „przy okazji”.
+- Nigdy nie wypisuj sekretów.
+- Najpierw uruchom `npm test`, dopiero potem zmieniaj kod.
+- Każdą zmianę kończ: `npm run lint` + `npm test` + `npm run build`.
+- Nie wiesz = zapytaj. Nie zgaduj.
+- To nie jest dsaas-platform-main. Zakaz ENT-* i kanonu platformy.

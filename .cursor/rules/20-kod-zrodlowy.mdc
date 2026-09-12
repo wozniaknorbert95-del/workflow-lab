@@ -1,0 +1,13 @@
+---
+description: Zasady dla plików źródłowych — testy, obsługa błędów, styl
+globs: src/**
+alwaysApply: false
+---
+
+# Zasady kodu źródłowego
+
+- Nowa logika = testy w tym samym MR (ścieżka szczęśliwa + min. 1 brzeg).
+- Naprawa buga bez testu regresyjnego = MR odrzucony.
+- Błędy: rzucaj `TypeError`/`Error` z jasnym komunikatem — nigdy pusty `catch {}`.
+- Zero nowych zależności. Jeśli bez tego się nie da — uzasadnij w MR i `DECISIONS.md`.
+- `console.log` tylko w entry (`isMain` w `hello.js`).

@@ -1,0 +1,14 @@
+{
+  "name": "workflow-lab",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test src/hello.test.js",
+    "lint": "node --check src/hello.js && node --check src/hello.test.js && node --check scripts/build.js",
+    "build": "node scripts/build.js"
+  }
+}

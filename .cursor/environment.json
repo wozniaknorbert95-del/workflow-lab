@@ -1,0 +1,10 @@
+{
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "install": "true",
+  "terminals": [
+    { "name": "dev", "command": "node src/hello.js" }
+  ]
+}
