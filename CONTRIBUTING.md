@@ -7,3 +7,5 @@
 5. Wait for green CI. **A human merges.** Agents never merge.
 
 This gym is not `dsaas-platform-main` and not the Academy. Do not mix.
+
+Automation B8-T3 verified 2026-09-12.
