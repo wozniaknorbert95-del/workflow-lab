@@ -13,3 +13,7 @@ test("greet trims whitespace", () => {
 test("greet rejects empty name", () => {
   assert.throws(() => greet("  "), TypeError);
 });
+
+test("greet Cloud", () => {
+  assert.equal(greet("Cloud"), "hello Cloud");
+});
