@@ -1,7 +1,7 @@
 {
   "name": "workflow-lab",
   "build": {
-    "dockerfile": "Dockerfile",
+    "dockerfile": ".cursor/Dockerfile",
     "context": "."
   },
   "install": "npm run lint && npm test",
