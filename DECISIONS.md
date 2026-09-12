@@ -2,6 +2,16 @@
 
 One page. Newest first. Every irreversible choice lives here.
 
+## D-B9-MORNING-RITUAL (2026-09-12) — B9-T2 morning ritual PASS
+
+**Decision:** The morning ritual is a 10-minute operational checklist, not another dashboard. The SSoT is `docs/MORNING-RITUAL.md`, linked from `README.md`.
+
+**Source:** `workflow-marzen/04-INSTRUKCJA-OBSUGI.md` §2: read daily digest, check Linear `In review`, check agent runs, choose 1-3 priorities.
+
+**Rules:** No deploy decisions, no spend/upgrades, no `dsaas-platform-main` work from this ritual. Output is one line: `Today first: <one action, one owner, one link>`.
+
+**Evidence:** `docs/MORNING-RITUAL.md`, `README.md`, `docs/BATCH-09.md`.
+
 ## D-B9-DAILY-DIGEST (2026-09-12) — B9-T1 daily digest PASS
 
 **Decision:** B9-T1 uses both Cursor Automation and a GitHub Actions workflow. Cursor Automation is the visible scheduled agent (`workflow-lab: daily digest 07:30`); GitHub Actions is the reliable writer to GitHub issue [#44](https://github.com/wozniaknorbert95-del/workflow-lab/issues/44).
