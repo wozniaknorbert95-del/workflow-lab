@@ -1,0 +1,29 @@
+name: daily-digest
+
+on:
+  schedule:
+    # Cursor Automations stores cron in UTC. This is 07:30 Europe/Warsaw during CEST.
+    - cron: "30 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+  checks: read
+
+jobs:
+  post-digest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Post daily digest to tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          DIGEST_HEADING: "Daily digest"
+          POST_COMMENT: "true"
+          TRACKING_ISSUE: "44"
+        run: node scripts/daily-digest.mjs
