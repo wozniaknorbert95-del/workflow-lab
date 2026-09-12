@@ -2,6 +2,18 @@
 
 One page. Newest first. Every irreversible choice lives here.
 
+## D-B8-GROK-BADACZ (2026-09-12) — B8-T4 Grok Bot BADACZ PASS
+
+**Bot:** `BADACZ` in Grok Bot desktop **v0.44.0** (signed in, Cursor Pro+).
+
+**Setup:** Onboarding Engineering + GitHub/Cursor → bot name BADACZ, job *Research analyst (non-code)*, prompt `docs/grok-bots/BADACZ.md`. Automated via Playwright CDP (`scripts/grok-bot-setup-badacz.mjs`, port 9224).
+
+**Smoke:** Query on GitHub Actions billing for public repos → answer cited official docs (standard runners free; larger runners billed). Transcript `docs/evidence/b8-t4-grok-smoke-transcript.txt` · report `docs/evidence/b8-t4-badacz-smoke-report.md` · screenshot `b8-t4-grok-07-smoke-response.png`.
+
+**Runbook:** `docs/GROK-BADACZ-SETUP.md`
+
+**Batch 8 exit gate:** B8-T3 + B8-T4 → **F4 partial PASS** (Slack PARKED).
+
 ## D-B8-AUTOMATION (2026-09-12) — B8-T3 Automation PASS
 
 **Automation:** [workflow-lab: agent issue → Cloud Agent](https://cursor.com/automations/64ead0a5-aeb1-11f1-bf4b-42ffb4d10ea7) — **enabled**.
