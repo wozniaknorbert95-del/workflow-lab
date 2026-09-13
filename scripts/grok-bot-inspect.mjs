@@ -1,4 +1,4 @@
-﻿import { chromium } from 'playwright';
+import { chromium } from 'playwright';
 
 const browser = await chromium.connectOverCDP('http://127.0.0.1:9224');
 for (const ctx of browser.contexts()) {
