@@ -8,7 +8,7 @@ Daily digest posts the `workflow-lab` morning status to GitHub issue
 - Cursor Automation: `workflow-lab: daily digest 07:30`
 - GitHub Actions workflow: `.github/workflows/daily-digest.yml`
 - Script: `scripts/daily-digest.mjs`
-- Schedule: `30 5 * * *` UTC, shown in Cursor as `07:30 Europe/Warsaw` during CEST
+- Schedule: `30 5 * * 1,3,5` UTC (Mon/Wed/Fri 07:30 Europe/Warsaw during CEST). Phase 1 audit reduced from daily — see `docs/AUDIT-PHASE-1.md`.
 - Output target: GitHub issue #44
 
 ## Digest Content

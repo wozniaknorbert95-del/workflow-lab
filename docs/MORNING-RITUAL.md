@@ -1,7 +1,7 @@
 # Morning Ritual — 10 Minutes
 
-Use this every morning after the 07:30 daily digest lands in issue
-[#44](https://github.com/wozniaknorbert95-del/workflow-lab/issues/44).
+Use this on digest days (Mon/Wed/Fri 07:30 Europe/Warsaw) after the digest lands in issue
+[#44](https://github.com/wozniaknorbert95-del/workflow-lab/issues/44), or any morning you need a status pass.
 
 Goal: know what needs your decision today without opening five dashboards.
 
@@ -16,7 +16,8 @@ Set a 10-minute timer. Stop when the timer ends. Anything unclear becomes one ne
 | 0-2 | Read the latest daily digest in issue #44 | You know open `agent` issues, PRs waiting review/merge, and CI red |
 | 2-4 | Open Linear `workflow-lab` board | You checked what is `In review` |
 | 4-7 | Check agent runs / open PRs | Each finished run has one status: merge, comment, or close |
-| 7-9 | Pick 1-3 priorities for today | Priorities have labels/status in Linear or GitHub |
+| 7-8 | Pick 1-3 priorities for today | Priorities have labels/status in Linear or GitHub |
+| 8-9 | Weekly security sweep (if due) | Run Actions → `weekly-security-sweep` → `Run workflow` when no open sweep issue this ISO week |
 | 9-10 | Write one sentence: "first action now" | You can start without re-reading context |
 
 ## Decision Rules

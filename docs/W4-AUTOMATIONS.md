@@ -5,34 +5,33 @@ Until then these are specs only. Activation = Commander.
 
 Source: `akademia/ops/workflow-marzen/04-INSTRUKCJA-OBSUGI.md` rytuały 10′/5′/piątek.
 
-## Automation 1 — daily digest (07:30)
+## Automation 1 — digest (07:30, Mon/Wed/Fri)
 
-Trigger: cron 07:30 Europe/Warsaw.
+Trigger: cron Mon/Wed/Fri 07:30 Europe/Warsaw (Phase 1 audit, 2026-09-13).
 Action: comment on Linear project `workflow-lab` (or GitHub tracking issue) with: open `agent` issues, PRs waiting review, CI red.
 Do not post secrets. Do not mention dsaas ENT-*.
 
-**Implemented (B9-T1, 2026-09-12):**
+**Implemented (B9-T1, 2026-09-12; schedule optimized Phase 1, 2026-09-13):**
 
-- Cursor Automation: `workflow-lab: daily digest 07:30`
+- Cursor Automation: `workflow-lab: daily digest 07:30` *(Commander: align Cursor UI schedule to Mon/Wed/Fri if still daily)*
 - Automation ID: `d968fd5d-aeb5-11f1-bf4b-42ffb4d10ea7`
-- Cursor schedule shown in UI: **Every day at 07:30**
-- Stored cron: `30 5 * * *` UTC (07:30 Europe/Warsaw during CEST)
+- GitHub Actions cron: `30 5 * * 1,3,5` UTC (Mon/Wed/Fri 07:30 Europe/Warsaw during CEST)
 - Durable output path: GitHub issue [#44](https://github.com/wozniaknorbert95-del/workflow-lab/issues/44)
 - Reliable posting mechanism: `.github/workflows/daily-digest.yml` → `scripts/daily-digest.mjs`
 - Smoke: final comment on #44 shows `Open agent issues: 0`, `PRs waiting review/merge: 0`, `CI red: 0`
 
-## Automation 2 — weekly security sweep (Monday)
+## Automation 2 — weekly security sweep (manual)
 
-Trigger: weekly.
+Trigger: `workflow_dispatch` only (Phase 1 audit, 2026-09-13). Run from morning ritual or Actions tab.
 Action: open issue `chore: weekly security sweep` labeled `agent`.
 Body: run skill `review-bezpieczenstwa` on `main` since last sweep. Output = list or “clean”.
 
-**Implemented (B9-T5, 2026-09-12):**
+**Implemented (B9-T5, 2026-09-12; schedule removed Phase 1, 2026-09-13):**
 
 - GitHub Actions workflow: `.github/workflows/weekly-security-sweep.yml`
 - Reliable issue opener: `scripts/weekly-security-sweep.mjs`
-- Schedule: Monday `0 5 * * 1` UTC (morning Europe/Warsaw window during CEST)
-- Manual smoke path: workflow dispatch; script is idempotent per ISO week and reuses an existing open sweep issue instead of creating duplicates
+- Trigger: manual only — no cron (saves scheduled minutes; morning ritual owns cadence)
+- Script is idempotent per ISO week and reuses an existing open sweep issue instead of creating duplicates
 - Output issue body points to skill `review-bezpieczenstwa` and requires `PASS: clean` or exact blockers
 
 ## Automation 3 — label `agent` → plan comment

@@ -2,11 +2,27 @@
 
 One page. Newest first. Every irreversible choice lives here.
 
+## D-AUDIT-PHASE-1 (2026-09-13) — CI workflow optimization PASS
+
+**Decision:** Phase 1 audit reduces GitHub Actions spend without weakening code CI. SSoT: `docs/AUDIT-PHASE-1.md` · branch `audit/phase-1-optimize-ci-workflows`.
+
+**Changes:**
+
+1. `daily-digest.yml` — cron `30 5 * * 1,3,5` (Mon/Wed/Fri 07:30 Europe/Warsaw), not daily.
+2. `weekly-security-sweep.yml` — `workflow_dispatch` only; no scheduled cron.
+3. `ci.yml` — path filters on `src/**`, `scripts/**`, `package.json`, `.github/workflows/ci.yml`.
+
+**Human-stop:** Merge PR after green CI. Align Cursor Automation digest schedule in UI if still daily (GitHub Actions already updated).
+
+**Evidence:** `docs/AUDIT-PHASE-1.md`, updated `docs/DAILY-DIGEST.md`, `docs/W4-AUTOMATIONS.md`, `docs/MORNING-RITUAL.md`.
+
 ## D-B9-WEEKLY-SECURITY-SWEEP (2026-09-12) — B9-T5 weekly security sweep PASS
+
+**Superseded schedule (Phase 1, 2026-09-13):** cron removed; manual trigger only. See `D-AUDIT-PHASE-1`.
 
 **Decision:** Weekly security sweep is a GitHub Actions issue opener, not a secret-bearing external automation. The SSoT is `.github/workflows/weekly-security-sweep.yml` running `scripts/weekly-security-sweep.mjs`.
 
-**Schedule:** Mondays at `0 5 * * 1` UTC, matching the morning workflow window during Europe/Warsaw CEST. Manual smoke uses `workflow_dispatch`.
+**Schedule (original):** Mondays at `0 5 * * 1` UTC. **Current (Phase 1):** manual `workflow_dispatch` only — see `D-AUDIT-PHASE-1`.
 
 **Rules:** The action creates at most one open issue per ISO week, titled `chore: weekly security sweep <YYYY-Www>`, labeled `agent`. Body instructs the agent to run skill `review-bezpieczenstwa` on `main` since last sweep and return `PASS: clean` or exact blockers. No secrets, no dsaas work, no code execution outside this lab.
 
@@ -38,7 +54,7 @@ One page. Newest first. Every irreversible choice lives here.
 
 **Why:** Cursor Automation test run succeeded, but Run History showed `Tools: —` and did not post a GitHub issue comment. GitHub Actions with `GITHUB_TOKEN` can safely comment on the tracking issue without Slack or external secrets.
 
-**Schedule:** Cursor UI shows **Every day at 07:30**. Stored cron is `30 5 * * *` UTC for 07:30 Europe/Warsaw during CEST.
+**Schedule (original):** Cursor UI **Every day at 07:30**; GitHub Actions cron `30 5 * * *` UTC. **Current (Phase 1):** GitHub Actions cron `30 5 * * 1,3,5` UTC (Mon/Wed/Fri) — see `D-AUDIT-PHASE-1`. Cursor Automation UI may still show daily until Commander aligns.
 
 **Implementation:** `.github/workflows/daily-digest.yml` runs `scripts/daily-digest.mjs`, posting open `agent` issues, open PRs, red CI, and one next action to issue #44. The script excludes the tracking issue itself from `agent` issue counts.
 
