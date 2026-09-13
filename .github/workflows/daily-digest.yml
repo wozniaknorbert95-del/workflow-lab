@@ -2,8 +2,8 @@ name: daily-digest
 
 on:
   schedule:
-    # Cursor Automations stores cron in UTC. This is 07:30 Europe/Warsaw during CEST.
-    - cron: "30 5 * * *"
+    # Changed from daily to 3x per week (Mon/Wed/Fri at 07:30 Europe/Warsaw)
+    - cron: "30 5 * * 1,3,5"
   workflow_dispatch:
 
 permissions:
@@ -19,11 +19,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Post daily digest to tracking issue
+      - name: Post digest to tracking issue
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          DIGEST_HEADING: "Daily digest"
+          DIGEST_HEADING: "Digest"
           POST_COMMENT: "true"
           TRACKING_ISSUE: "44"
         run: node scripts/daily-digest.mjs
