@@ -1,0 +1,62 @@
+{
+  "folders": [
+    {
+      "name": "workflow-lab (QF · poligon)",
+      "path": "."
+    }
+  ],
+  "settings": {
+    "window.title": "QF · workflow-lab — ${activeEditorShort}",
+    "files.exclude": {
+      "node_modules": true,
+      "dist": true,
+      ".opencode": true,
+      ".cursor/debug-*.log": true,
+      ".issue-*.md": true,
+      ".cursor-comment-*.md": true,
+      "**/.DS_Store": true
+    },
+    "terminal.integrated.cwd": "${workspaceFolder}"
+  },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "lint",
+        "type": "shell",
+        "command": "npm run lint",
+        "group": "build",
+        "presentation": {
+          "reveal": "always",
+          "panel": "shared"
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "test",
+        "type": "shell",
+        "command": "npm test",
+        "group": {
+          "kind": "test",
+          "isDefault": true
+        },
+        "presentation": {
+          "reveal": "always",
+          "panel": "shared"
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "build",
+        "type": "shell",
+        "command": "npm run build",
+        "group": "build",
+        "presentation": {
+          "reveal": "always",
+          "panel": "shared"
+        },
+        "problemMatcher": []
+      }
+    ]
+  }
+}
