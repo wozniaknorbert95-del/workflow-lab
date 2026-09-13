@@ -1,9 +1,7 @@
 name: weekly-security-sweep
 
 on:
-  schedule:
-    # 07:00 Europe/Warsaw during CEST. GitHub schedules are UTC.
-    - cron: "0 5 * * 1"
+  # Phase 1: manual-only — run from Actions tab or morning ritual checklist.
   workflow_dispatch:
 
 permissions:
