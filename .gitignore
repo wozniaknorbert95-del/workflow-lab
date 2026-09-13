@@ -8,3 +8,5 @@ dist/
 .pytest_cache/
 .cursor/debug*.log
 .opencode/
+.issue-*.md
+.cursor-comment-*.md
