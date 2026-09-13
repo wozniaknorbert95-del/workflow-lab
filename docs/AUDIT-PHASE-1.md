@@ -1,6 +1,6 @@
 # Audit Phase 1 — CI workflow optimization
 
-**Scope:** `workflow-lab` only. **Branch:** `audit/phase-1-optimize-ci-workflows`.  
+**Scope:** `workflow-lab` only. **Branch:** `cursor/phase-1-optimize-ci-workflows-4fbb` (renamed from `audit/phase-1-optimize-ci-workflows`).  
 **Started by:** Copilot (daily-digest). **Completed by:** Cursor Agent (2026-09-13).
 
 ## Goal

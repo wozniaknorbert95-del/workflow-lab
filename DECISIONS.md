@@ -4,7 +4,7 @@ One page. Newest first. Every irreversible choice lives here.
 
 ## D-AUDIT-PHASE-1 (2026-09-13) — CI workflow optimization PASS
 
-**Decision:** Phase 1 audit reduces GitHub Actions spend without weakening code CI. SSoT: `docs/AUDIT-PHASE-1.md` · branch `audit/phase-1-optimize-ci-workflows`.
+**Decision:** Phase 1 audit reduces GitHub Actions spend without weakening code CI. SSoT: `docs/AUDIT-PHASE-1.md` · branch `cursor/phase-1-optimize-ci-workflows-4fbb`.
 
 **Changes:**
 
