@@ -29,9 +29,11 @@ One page. Newest first. Every irreversible choice lives here.
 - Notebook layer: `notebooks/**` + `requirements.txt` (pinned) + `.github/workflows/notebooks.yml` (path-filtered) + `scripts/run-notebooks.sh` + `.gitattributes` (nbstripout, no outputs in git).
 - CI parity: the notebook layer gets its own path-filtered job (GitHub + GitLab), **not** injected into the Node `validate` job.
 
-**Follow-ups (not in this MR):** add Python to `.cursor/Dockerfile` so Cloud Agents can also run notebooks (cost/complexity tradeoff — Commander to decide); extend `review-bezpieczenstwa` skill with an `.ipynb` secret-scan step.
+**Cloud Agent runtime:** `.cursor/Dockerfile` adds `python3` + `pip`/`venv` so Cloud Agents can run notebooks on demand (deps via `requirements.txt`, not baked at build time).
 
-**Evidence:** `notebooks/`, `requirements.txt`, `.github/workflows/notebooks.yml`, `scripts/run-notebooks.sh`, `.gitattributes`, `notebooks/README.md`, `.cursor/skills/dodaj-notebook/SKILL.md`.
+**Security:** `review-bezpieczenstwa` skill gains a notebook step — `nbstripout --verify` + cell secret check.
+
+**Evidence:** `notebooks/`, `requirements.txt`, `.github/workflows/notebooks.yml`, `scripts/run-notebooks.sh`, `.gitattributes` (`* text=auto` + ipynb filter), `notebooks/README.md`, `.cursor/skills/dodaj-notebook/SKILL.md`, `.cursor/Dockerfile`.
 
 ## D-B9-WEEKLY-SECURITY-SWEEP (2026-09-12) — B9-T5 weekly security sweep PASS
 
