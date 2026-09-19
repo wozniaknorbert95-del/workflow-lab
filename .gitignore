@@ -10,3 +10,11 @@ dist/
 .opencode/
 .issue-*.md
 .cursor-comment-*.md
+
+# Python / Jupyter notebook layer
+__pycache__/
+.venv/
+venv/
+.ipynb_checkpoints/
+.jupyter/
+*.pyc

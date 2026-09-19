@@ -18,6 +18,21 @@ One page. Newest first. Every irreversible choice lives here.
 
 **Evidence:** `.github/workflows/automerge.yml`, `.github/workflows/ci.yml` (always-report `validate`), branch protection (`validate` required), updated constitution docs.
 
+## D-W7-JUPYTER (2026-09-19) — Jupyter Notebook analysis layer (architecture addition)
+
+**Decision:** `workflow-lab` gains an **opt-in Python notebook layer** for reproducible analysis/evidence (`notebooks/**`), kept strictly separate from the Node 20 zero-dependency core. The core loop (`npm run lint/test/build` = CI `validate`, `greet`) is unchanged.
+
+**Why:** Commander requested Jupyter Notebook as a workflow tool for analysis/evidence (reproducible reports, cost/CI metrics). Introducing Python is an architecture change — recorded here per AGENTS.md rule 2/5.
+
+**Shape (two-layer model):**
+- Node core: unchanged — zero deps, `fresh clone = works`.
+- Notebook layer: `notebooks/**` + `requirements.txt` (pinned) + `.github/workflows/notebooks.yml` (path-filtered) + `scripts/run-notebooks.sh` + `.gitattributes` (nbstripout, no outputs in git).
+- CI parity: the notebook layer gets its own path-filtered job (GitHub + GitLab), **not** injected into the Node `validate` job.
+
+**Follow-ups (not in this MR):** add Python to `.cursor/Dockerfile` so Cloud Agents can also run notebooks (cost/complexity tradeoff — Commander to decide); extend `review-bezpieczenstwa` skill with an `.ipynb` secret-scan step.
+
+**Evidence:** `notebooks/`, `requirements.txt`, `.github/workflows/notebooks.yml`, `scripts/run-notebooks.sh`, `.gitattributes`, `notebooks/README.md`, `.cursor/skills/dodaj-notebook/SKILL.md`.
+
 ## D-B9-WEEKLY-SECURITY-SWEEP (2026-09-12) — B9-T5 weekly security sweep PASS
 
 **Decision:** Weekly security sweep is a GitHub Actions issue opener, not a secret-bearing external automation. The SSoT is `.github/workflows/weekly-security-sweep.yml` running `scripts/weekly-security-sweep.mjs`.

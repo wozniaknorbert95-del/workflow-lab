@@ -2,6 +2,7 @@ stages:
   - validate
   - test
   - build
+  - notebooks
 
 lint:
   stage: validate
@@ -26,6 +27,17 @@ build:
     paths:
       - dist/
     expire_in: 1 day
+
+notebooks:
+  stage: notebooks
+  image: python:3.12
+  interruptible: true
+  script:
+    - python -m pip install --upgrade pip
+    - python -m pip install -r requirements.txt
+    - python -m ipykernel install --user --name=ci-kernel
+    - python -m nbstripout --verify notebooks/*.ipynb
+    - bash scripts/run-notebooks.sh ci-kernel 600
 
 workflow:
   rules:

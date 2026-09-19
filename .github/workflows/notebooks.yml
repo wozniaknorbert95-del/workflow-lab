@@ -1,0 +1,39 @@
+name: notebooks
+
+on:
+  pull_request:
+    paths:
+      - "notebooks/**"
+      - "requirements.txt"
+      - "scripts/run-notebooks.sh"
+      - ".github/workflows/notebooks.yml"
+  push:
+    branches: [main]
+    paths:
+      - "notebooks/**"
+      - "requirements.txt"
+      - "scripts/run-notebooks.sh"
+      - ".github/workflows/notebooks.yml"
+  workflow_dispatch:
+
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install notebook tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+      - name: Register CI kernel
+        run: |
+          python -m ipykernel install --user --name=ci-kernel
+          jupyter kernelspec list
+      - name: Verify no outputs are committed
+        run: python -m nbstripout --verify notebooks/*.ipynb
+      - name: Execute notebooks
+        run: bash scripts/run-notebooks.sh ci-kernel 600
