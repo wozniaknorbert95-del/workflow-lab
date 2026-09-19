@@ -3,7 +3,7 @@
 You are an AI agent in this repository. These rules override your defaults.
 If a user request conflicts with this file — stop and ask.
 
-This repo is the **workflow loop gym** (issue → branch → tests → MR → CI → human merge).
+This repo is the **workflow loop gym** (issue → branch → tests → MR → CI → auto-merge).
 It is **not** `dsaas-platform-main`. Never copy platform canon here. Never deploy the platform from here.
 
 ## 0. TL;DR — never break these
@@ -30,7 +30,7 @@ It is **not** `dsaas-platform-main`. Never copy platform canon here. Never deplo
 12. Every MR links an issue (`Closes #123`) and says: what, why, how tested.
 13. Code/comments/commits in **English**. User-facing docs may be Polish.
 14. If you lack permission or the task exceeds scope — stop and describe the blocker.
-15. Merge is a **human**. You open the MR; you do not merge.
+15. Merge is **automatic** (D-AUTOMERGE). A non-draft PR with green required checks auto-merges (squash). Add the `no-automerge` label to hold a PR. Never push to `main`.
 16. Deploy of `dsaas-platform-main` is out of scope forever.
 
 ## 2. Project commands (truth — same as CI)
@@ -93,6 +93,6 @@ STOP → one concrete question (what is unclear, options, your recommendation).
 - **Platform** — `dsaas-platform-main`; forbidden here.
 - **Academy** — separate school repo; lessons do not live here.
 - **Origin** — the single git remote that is SoT (see `DECISIONS.md` D-W0-ORIGIN).
-- **Human merge** — only the Commander merges to `main`.
+- **Auto-merge** — non-draft PRs merge automatically when required checks pass (D-AUTOMERGE); the `no-automerge` label holds a PR.
 - **Track W** — workflow skills practiced in this repo.
 - **Track F** — how a lab gesture maps onto existing Kokpit departments + Taca (not a 7th department).

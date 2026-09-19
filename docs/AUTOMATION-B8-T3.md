@@ -46,7 +46,7 @@ WORKFLOW:
    - What / Why / How tested
    - Closes #<issue_number>
    - Checklist from AGENTS.md §6
-5. Do NOT merge to main. Human merges after CI validate is green.
+5. Do NOT push to main. Auto-merge merges after CI validate is green.
 
 SKILLS (if relevant):
 - .cursor/skills/dodaj-test/

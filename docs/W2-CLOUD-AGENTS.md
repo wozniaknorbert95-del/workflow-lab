@@ -40,9 +40,9 @@ WERYFIKACJA: `npm test`.
 
 ### CA-3 CONTRIBUTING one-pager
 
-CEL: `CONTRIBUTING.md` (≤40 linii) opisuje pętlę branch→CI→human merge.
+CEL: `CONTRIBUTING.md` (≤40 linii) opisuje pętlę branch→CI→auto-merge.
 KONTEKST: `AGENTS.md` §4–6.
-WYMAGANIA: link do issue template; zakaz merge przez agenta.
+WYMAGANIA: link do issue template; zakaz push do `main` przez agenta.
 OGRANICZENIA: nie zmieniaj CI.
 KRYTERIA: lint/test/build zielone.
 WERYFIKACJA: plik istnieje.
