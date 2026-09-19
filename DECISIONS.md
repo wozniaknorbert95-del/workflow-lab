@@ -10,9 +10,8 @@ One page. Newest first. Every irreversible choice lives here.
 
 **Mechanism:**
 - `.github/workflows/automerge.yml` enables GitHub native auto-merge (squash + delete branch) on every non-draft PR.
-- Required check on `main`: `validate` (Node core). `ci.yml` now **always reports** — path filtering moved from the workflow trigger to an internal step guard, so docs-only PRs report green instead of "no check" (this removes the old admin-override need).
+- Required checks on `main`: `validate` (Node core) and `execute` (notebooks). Both **always report** — path filtering moved from the workflow trigger to an internal step guard, so docs-only PRs report green instead of "no check" (this removes the old admin-override need).
 - **Escape hatch:** the `no-automerge` (or `blocked`) label disables auto-merge; removing it re-enables. Drafts never auto-merge.
-- Notebook gating: `execute` (`.github/workflows/notebooks.yml`) becomes a required check in a follow-up once #56 lands the notebook layer on `main`.
 
 **Risk (accepted by Commander):** anyone able to open a PR that passes CI gets code into `main`. Low for this lab (synthetic code, public repo, single owner, no prod deploy from here). Reversible by reverting this entry + restoring the human-merge rule.
 
