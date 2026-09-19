@@ -11,4 +11,4 @@ alwaysApply: true
 - Każdy MR/PR linkuje issue: `Closes #<numer>`.
 - MR >400 linii → zaproponuj podział.
 - Przed otwarciem MR: DoD z AGENTS.md.
-- Nigdy nie mergujesz własnego MR-a — merge = człowiek po review i zielonym CI.
+- Merge jest automatyczny (D-AUTOMERGE): non-draft PR z zielonymi wymaganymi checkami merguje się sam. Etykieta `no-automerge` = hold. Nigdy nie pushujesz do `main`.

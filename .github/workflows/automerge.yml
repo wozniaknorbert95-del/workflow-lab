@@ -1,0 +1,34 @@
+name: automerge
+
+# Full auto-merge policy (D-AUTOMERGE): a non-draft PR without the hold label
+# auto-merges (squash + delete branch) once required checks pass.
+#
+# Security note: this workflow uses `on: pull_request`, so it runs the version
+# from the PR branch. That is what lets the PR that introduces this file
+# self-bootstrap. This repo is single-owner with no external forks, so running
+# PR-branch workflow code with a write token is acceptable here. A fork-based
+# workflow would need `pull_request_target` instead.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review, labeled, unlabeled]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  automerge:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: Disable auto-merge when hold label present
+        if: contains(github.event.pull_request.labels.*.name, 'no-automerge') || contains(github.event.pull_request.labels.*.name, 'blocked')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr merge --disable-auto "${{ github.event.pull_request.html_url }}" || true
+      - name: Enable auto-merge (squash + delete branch)
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-automerge') && !contains(github.event.pull_request.labels.*.name, 'blocked') }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr merge --auto --squash --delete-branch "${{ github.event.pull_request.html_url }}"

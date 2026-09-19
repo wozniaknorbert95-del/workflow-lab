@@ -60,7 +60,7 @@ Updated: 2026-09-12 (B9-T5 weekly security sweep PASS; `DECISIONS.md` D-B9-WEEKL
 | W-04 | One laptop loop: issue/PR → green CI → merge to `main` | PASS | https://github.com/wozniaknorbert95-del/workflow-lab/pull/1 merged 2026-09-12 (`4ea746d`) |
 | W-05 | One PR opened by Cursor Cloud Agent, CI green. Human merges. | PASS | Agent `bc-c187d412` → branch `cursor/greet-cloud-test-bfd7` → [PR #14](https://github.com/wozniaknorbert95-del/workflow-lab/pull/14) CI `validate` SUCCESS → squash-merged `8239f41` 2026-09-12. Infra: #12 ca-certificates, #13 curl. `DECISIONS.md` D-W5-CLOUD. |
 | W-06 | Linear mobile issue → Cloud Agent → GitHub mobile merge | **PASS** | [QUI-10](https://linear.app/quietforge/issue/QUI-10) → agent `bc-2aeab115` → [PR #34](https://github.com/wozniaknorbert95-del/workflow-lab/pull/34) CI green → **GitHub mobile merge** `b8e261a` 2026-09-12. `DECISIONS.md` D-W6-PHONE. |
-| W-07 | Human gates: merge, secrets, no dual-origin, no dsaas deploy from lab | PASS | `AGENTS.md` §1; `DECISIONS.md` D-W0 / D-C7 |
+| W-07 | Human gates: secrets, no dual-origin, no dsaas deploy from lab. Merge is automated (D-AUTOMERGE). | PASS | `AGENTS.md` §1; `DECISIONS.md` D-W0 / D-C7 / D-AUTOMERGE |
 | W-08 | C7: dsaas not on this board | PASS | `DECISIONS.md` D-C7 |
 | W-09 | Cursor spend limit on. `$/MR` recorded after first cloud run | PASS | Pro+ On-Demand Unlimited. First cloud delivery W-05 agent `bc-c187d412`. Usage snapshot 2026-09-12: 96.8M tokens included, on-demand **$0** ([dashboard/usage](https://cursor.com/dashboard/usage)). `$/MR` marginal = **$0** on included plan (`DECISIONS.md` D-W9-USAGE). |
 | W-10 | `DECISIONS.md` current | PASS | D-W5-CLOUD, D-W9-USAGE, D-W01-PROTECT, D-W3-LINEAR, D-W4-LOOP |

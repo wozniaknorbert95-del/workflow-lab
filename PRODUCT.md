@@ -33,7 +33,7 @@ Tracked in `docs/DOD-WORKFLOW.md`. Current state (2026-09-12):
 3. Agent runs lint → test → build before PR.
 4. CI `validate` mirrors local commands.
 5. Bugbot/Security (when enabled) review before Commander.
-6. Commander squash-merges; irreversible choices → `DECISIONS.md`.
+6. Auto-merge squash-merges on green CI; irreversible choices → `DECISIONS.md`.
 
 ## Metrics we care about
 

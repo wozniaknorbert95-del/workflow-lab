@@ -2,6 +2,22 @@
 
 One page. Newest first. Every irreversible choice lives here.
 
+## D-AUTOMERGE (2026-09-19) — full auto-merge (replaces the human-merge gate)
+
+**Decision:** `main` merge becomes **automatic** for ready, non-draft PRs that pass required checks. This **replaces** the previous "human merge only" gate (old `AGENTS.md` §1.15, `ARCHITECTURE.md` decision #3, `CONTRIBUTING.md`, `docs/LOOP.md`, `docs/LINEAR.md`, `rules/10-git-flow`).
+
+**Why:** the manual merge click was the last non-autonomous step in the loop and contradicted the lab's autonomy goal (idea → issue → agent → MR → CI → merge, without opening a laptop). Commander chose the **full** auto-merge model.
+
+**Mechanism:**
+- `.github/workflows/automerge.yml` enables GitHub native auto-merge (squash + delete branch) on every non-draft PR.
+- Required check on `main`: `validate` (Node core). `ci.yml` now **always reports** — path filtering moved from the workflow trigger to an internal step guard, so docs-only PRs report green instead of "no check" (this removes the old admin-override need).
+- **Escape hatch:** the `no-automerge` (or `blocked`) label disables auto-merge; removing it re-enables. Drafts never auto-merge.
+- Notebook gating: `execute` (`.github/workflows/notebooks.yml`) becomes a required check in a follow-up once #56 lands the notebook layer on `main`.
+
+**Risk (accepted by Commander):** anyone able to open a PR that passes CI gets code into `main`. Low for this lab (synthetic code, public repo, single owner, no prod deploy from here). Reversible by reverting this entry + restoring the human-merge rule.
+
+**Evidence:** `.github/workflows/automerge.yml`, `.github/workflows/ci.yml` (always-report `validate`), branch protection (`validate` required), updated constitution docs.
+
 ## D-B9-WEEKLY-SECURITY-SWEEP (2026-09-12) — B9-T5 weekly security sweep PASS
 
 **Decision:** Weekly security sweep is a GitHub Actions issue opener, not a secret-bearing external automation. The SSoT is `.github/workflows/weekly-security-sweep.yml` running `scripts/weekly-security-sweep.mjs`.

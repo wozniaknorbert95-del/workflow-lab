@@ -1,31 +1,39 @@
 name: ci
 
 on:
-  pull_request:
-    paths:
-      - "src/**"
-      - "scripts/**"
-      - "package.json"
-      - ".github/workflows/ci.yml"
+  pull_request: {}
   push:
     branches: [main]
-    paths:
-      - "src/**"
-      - "scripts/**"
-      - "package.json"
-      - ".github/workflows/ci.yml"
 
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Detect core changes
+        id: detect
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch origin "${{ github.base_ref }}" --depth=1
+            if git diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -qE '^(src/|scripts/|package\.json|\.github/workflows/ci\.yml)'; then
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/setup-node@v4
+        if: steps.detect.outputs.changed == 'true'
         with:
           node-version: "20"
       - name: lint
+        if: steps.detect.outputs.changed == 'true'
         run: npm run lint
       - name: test
+        if: steps.detect.outputs.changed == 'true'
         run: npm test
       - name: build
+        if: steps.detect.outputs.changed == 'true'
         run: npm run build

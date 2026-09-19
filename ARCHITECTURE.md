@@ -12,7 +12,7 @@ Linear / GitHub issue (6-field template)
   → npm run lint && npm test && npm run build
   → PR (human opens or Cloud Agent auto-PR)
   → CI validate (same three commands)
-  → human merge → DECISIONS.md if irreversible
+  → auto-merge (green CI) → DECISIONS.md if irreversible
 ```
 
 ## Directory map
@@ -63,7 +63,7 @@ Cloud Agents clone via GitHub App, build `.cursor/Dockerfile`, run in isolated V
 
 1. **Zero npm deps** — fresh clone + Node 20 = works. Trade-off: no eslint/jest; use `node --check` + `node:test`.
 2. **Single origin GitHub** — lab SoT is `wozniaknorbert95-del/workflow-lab`. GitLab CE is future cutover (F0), not dual-origin.
-3. **Human merge only** — agents open PRs; Commander merges after CI + review. No auto-merge to `main`.
+3. **Auto-merge on green CI** (D-AUTOMERGE) — non-draft PRs auto-merge (squash) when required checks pass; `no-automerge` label holds. No one pushes to `main`.
 
 ## Where to add [example feature]
 
