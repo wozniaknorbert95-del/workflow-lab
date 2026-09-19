@@ -36,3 +36,10 @@ There is no `typecheck`. Do not invent one.
 - User-visible behaviour has an error path.
 - Do not delete or weaken a failing test unless the test is wrong.
 - Fresh clone + `AGENTS.md` = works (no install step).
+
+## Notebooks (opt-in Python layer)
+
+- Framework: `jupyter nbconvert --execute` with a registered `ci-kernel` (headless).
+- Every notebook has a happy-path cell + one edge cell; execution failure = CI red.
+- Outputs are never committed (`nbstripout` + `.gitattributes`); CI runs `nbstripout --verify`.
+- Runner: `scripts/run-notebooks.sh` · CI: `.github/workflows/notebooks.yml`.

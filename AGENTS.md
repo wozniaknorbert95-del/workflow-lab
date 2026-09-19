@@ -44,6 +44,8 @@ build:       npm run build
 
 There is no `typecheck` script. Do not invent one.
 
+**Notebook layer (opt-in, Python):** `notebooks/**` are analysis/evidence artifacts, separate from the Node core. Local: `pip install -r requirements.txt` then `jupyter lab`. CI: `.github/workflows/notebooks.yml` (path-filtered) → `scripts/run-notebooks.sh`. See `notebooks/README.md`. The core `install`/`test`/`lint`/`build` above stay Node-only and zero-dependency.
+
 ## 3. Architecture (max 15 lines)
 
 - Stack: Node 20, ESM, `node:test`, zero npm dependencies.
@@ -51,7 +53,8 @@ There is no `typecheck` script. Do not invent one.
 - `src/hello.test.js` — contract tests.
 - `scripts/build.js` — copies `src/` → `dist/`.
 - Details: `ARCHITECTURE.md`. Product intent: `PRODUCT.md`. History: `DECISIONS.md`.
-- Skills: `.cursor/skills/` — `dodaj-test`, `dodaj-script`, `review-bezpieczenstwa`.
+- Skills: `.cursor/skills/` — `dodaj-test`, `dodaj-script`, `dodaj-notebook`, `review-bezpieczenstwa`.
+- Notebooks: `notebooks/` — opt-in Python analysis layer (see `notebooks/README.md`).
 
 ## 4. Conventions
 

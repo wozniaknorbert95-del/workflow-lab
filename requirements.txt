@@ -1,0 +1,8 @@
+# Notebook layer (Python) — analysis/evidence for workflow-lab.
+# Pinned for reproducibility; bump on the first green CI run (record the date).
+# Local dev:  python -m venv .venv && pip install -r requirements.txt && jupyter lab
+# CI:         .github/workflows/notebooks.yml installs exactly this file (parity).
+nbconvert==7.16.4
+ipykernel==6.29.5
+nbstripout==0.8.1
+jupyterlab==4.2.5

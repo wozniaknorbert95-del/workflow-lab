@@ -25,6 +25,11 @@ Linear / GitHub issue (6-field template)
 | `scripts/cloud-env-diag.js` | Cloud Build smoke (TLS, curl, git) |
 | `.github/workflows/ci.yml` | GitHub CI — **must match** `AGENTS.md` §2 |
 | `.gitlab-ci.yml` | GitLab CE mirror (same commands, future F0) |
+| `notebooks/` | **Opt-in Python** analysis/evidence layer — not Node core |
+| `requirements.txt` | Pinned Python deps for the notebook layer |
+| `.github/workflows/notebooks.yml` | Notebook CI — executes `notebooks/*.ipynb` headless (path-filtered) |
+| `scripts/run-notebooks.sh` | Discovers + executes notebooks via `nbconvert` |
+| `.gitattributes` | `*.ipynb` nbstripout filter — no outputs in git |
 | `.cursor/Dockerfile` | Cloud Agent image: node:20 + ca-certificates + curl |
 | `.cursor/environment.json` | Cloud install + `dev` terminal |
 | `.cursor/skills/` | Repeatable procedures for agents |
@@ -38,6 +43,7 @@ Linear / GitHub issue (6-field template)
 - `greet(name = "workflow-lab")` — trims input; empty/whitespace → `TypeError`.
 - CLI: `node src/hello.js` prints default greeting (Cloud `dev` terminal).
 - Build output: `dist/hello.js` (artifact only; tests never copied).
+- Notebook layer (`notebooks/`): opt-in Python (venv + `requirements.txt`), executed headless in CI. It does **not** change the Node core's zero-dependency contract.
 
 ## CI parity rule
 
@@ -50,6 +56,8 @@ build: node scripts/build.js
 ```
 
 GitHub `validate` job and GitLab `lint`/`unit-tests`/`build` stages run **exactly** these. Do not add tools without updating all three surfaces.
+
+The notebook layer is a **separate, path-filtered** concern: `.github/workflows/notebooks.yml` (+ GitLab `notebooks` job) runs `jupyter nbconvert --execute` over `notebooks/*.ipynb` with a fresh `ci-kernel`. It does **not** run inside the Node `validate` job.
 
 ## Cloud Agent layer
 
@@ -72,6 +80,7 @@ Cloud Agents clone via GitHub App, build `.cursor/Dockerfile`, run in isolated V
 | New `greet` behaviour | `src/hello.js` + regression test in `src/hello.test.js` + row in `TESTING.md` |
 | New npm script | `package.json` + `AGENTS.md` §2 + CI yaml(s) — use skill `dodaj-script` |
 | New test file | `src/*.test.js` + wire in `package.json` `test` — use skill `dodaj-test` |
+| New notebook | `notebooks/*.ipynb` + `requirements.txt` if needed — use skill `dodaj-notebook` |
 | Cloud/env change | `.cursor/Dockerfile` or `environment.json` + `DECISIONS.md` entry |
 
 ## What is not here

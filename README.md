@@ -27,4 +27,6 @@ There is no `typecheck` script. Do not invent one.
 
 Node 20+. No dependencies.
 
+**Notebooks (opt-in, Python):** `notebooks/**` — analysis/evidence layer. `pip install -r requirements.txt` → `jupyter lab`. CI: `.github/workflows/notebooks.yml`. See `notebooks/README.md`.
+
 Academy (school) lives in a separate repo. Platform lives in `dsaas-platform-main`. Do not mix.
