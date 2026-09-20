@@ -40,6 +40,7 @@ install:     (none — no runtime dependencies)
 test:        npm test
 lint:        npm run lint
 build:       npm run build
+phone-loop:  python scripts/test_phone_loop_status.py && python scripts/hermes-operator-brief.py --self-test
 ```
 
 There is no `typecheck` script. Do not invent one.

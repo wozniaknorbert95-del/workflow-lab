@@ -1,0 +1,13 @@
+[Unit]
+Description=Phone loop status + operator brief (read-only)
+After=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/workflow-lab/hermes-engineer.env
+WorkingDirectory=/opt/workflow-lab
+ExecStart=/bin/sh -c '/usr/bin/python3 scripts/phone-loop-status.py | tee /var/log/hermes-phone-loop.json | /usr/bin/python3 scripts/hermes-operator-brief.py'
+# Brak git push / merge — tylko odczyt API (patrz HERMES-ENGINEER-SECRETS.md)
+
+[Install]
+WantedBy=multi-user.target

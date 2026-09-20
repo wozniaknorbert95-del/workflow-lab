@@ -1,0 +1,26 @@
+{
+  "linear": {
+    "issue_id": "QUI-TEST-1",
+    "six_fields": true,
+    "agent_label": true
+  },
+  "github": {
+    "cursor_comment": true,
+    "cloud_run_id": "run-1",
+    "pr_url": "https://github.com/wozniaknorbert95-del/workflow-lab/pull/99",
+    "head_ref": "cursor/smoke-w06"
+  },
+  "checks": {
+    "validate": "success",
+    "execute": "success",
+    "jobs_ran_steps": true
+  },
+  "review": {
+    "approved": true
+  },
+  "merge": {
+    "squash_on_main": true,
+    "sha": "abc123"
+  },
+  "ttl_minutes": 15
+}

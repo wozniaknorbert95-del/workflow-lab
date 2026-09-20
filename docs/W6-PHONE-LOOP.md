@@ -42,6 +42,7 @@ Add to `README.md` after Status line:
 
 ## Related
 
+- Deterministic status (S1–S6): `scripts/phone-loop-status.py` · operator brief: `scripts/hermes-operator-brief.py` · runbooks: `docs/ops/`
 - Batch tracker: `docs/BATCH-07.md`
 - GitHub issue: [#32](https://github.com/wozniaknorbert95-del/workflow-lab/issues/32)
 - Master plan: Faza 4 — `workflow-marzen/00-PLAN-DZIALANIA.md:174-179`

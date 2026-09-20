@@ -1,0 +1,10 @@
+[Unit]
+Description=Hermes phone loop supervisor tick
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Unit=hermes-phone-loop.service
+
+[Install]
+WantedBy=timers.target
