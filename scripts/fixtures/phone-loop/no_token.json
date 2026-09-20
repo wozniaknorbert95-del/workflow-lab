@@ -1,0 +1,7 @@
+{
+  "linear": { "missing_token": true },
+  "github": { "missing_token": true },
+  "checks": { "missing_token": true },
+  "review": { "missing_policy": true },
+  "merge": { "missing_token": true }
+}

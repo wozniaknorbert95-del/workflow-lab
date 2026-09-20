@@ -1,0 +1,23 @@
+{
+  "linear": {
+    "issue_id": "QUI-TEST-2",
+    "six_fields": true,
+    "agent_label": true
+  },
+  "github": {
+    "cursor_comment": true,
+    "pr_url": "https://github.com/wozniaknorbert95-del/workflow-lab/pull/100",
+    "head_ref": "cursor/ci-red"
+  },
+  "checks": {
+    "validate": "failure",
+    "execute": "success",
+    "jobs_ran_steps": true
+  },
+  "review": {
+    "approved": false
+  },
+  "merge": {
+    "squash_on_main": false
+  }
+}
