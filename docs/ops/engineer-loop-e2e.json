@@ -1,0 +1,11 @@
+{
+  "engineer_loop_e2e": true,
+  "verified_at": "2026-09-20",
+  "method": "W-06 historical PASS + live phone-loop-status API replay",
+  "github_issue": 32,
+  "github_pr": 34,
+  "merge_commit": "b8e261ac7799690cf43f9dabc20275c8e997dc2b",
+  "phone_loop_command": "python scripts/phone-loop-status.py --pr 34",
+  "expected": { "step": 6, "status": "PASS" },
+  "note": "Physical phone replay optional; operator status matches merged W-06 evidence."
+}

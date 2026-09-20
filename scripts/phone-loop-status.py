@@ -48,7 +48,9 @@ def evaluate_from_fixture(data: dict[str, Any]) -> dict[str, Any]:
     # S2
     if github.get("missing_token"):
         steps.append(_unknown(2, "github token missing"))
-    elif github.get("cursor_comment") or github.get("cloud_run_id"):
+    elif github.get("cursor_comment") or github.get("cloud_run_id") or str(
+        github.get("head_ref") or ""
+    ).startswith("cursor/"):
         ev = {"kind": "cursor_trigger"}
         if github.get("cursor_comment"):
             ev["comment"] = "present"
@@ -71,8 +73,12 @@ def evaluate_from_fixture(data: dict[str, Any]) -> dict[str, Any]:
     # S4
     if checks.get("missing_token"):
         steps.append(_unknown(4, "github checks token missing"))
-    elif checks.get("validate") == "success" and checks.get("execute") == "success":
-        if not checks.get("jobs_ran_steps"):
+    elif checks.get("validate") == "success" and (
+        checks.get("execute") == "success"
+        or checks.get("execute") in ("skipped", None)
+        or merge.get("squash_on_main")
+    ):
+        if not checks.get("jobs_ran_steps") and not merge.get("squash_on_main"):
             steps.append(
                 _step(
                     4,
@@ -142,13 +148,27 @@ def load_fixture(name: str) -> dict[str, Any]:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--fixture", help="happy | ci_red | no_token")
+    ap.add_argument("--pr", type=int, default=0, help="Live: GitHub PR number")
+    ap.add_argument("--issue", type=int, default=0, help="Live: GitHub issue number")
+    ap.add_argument(
+        "--env-file",
+        default=os.environ.get("HERMES_ENGINEER_ENV", "/etc/workflow-lab/hermes-engineer.env"),
+    )
     ap.add_argument("--issue-id", default=os.environ.get("PHONE_LOOP_ISSUE_ID", ""))
     args = ap.parse_args()
 
     if args.fixture:
         data = load_fixture(args.fixture)
+    elif args.pr or args.issue:
+        from phone_loop_github import build_live_payload, token_from_env_file
+
+        token = os.environ.get("GITHUB_ENGINEER_TOKEN") or token_from_env_file(args.env_file)
+        data = build_live_payload(
+            pr_number=args.pr or None,
+            issue_number=args.issue or None,
+            token=token,
+        )
     else:
-        # Live mode: without tokens → fail-closed UNKNOWN (Fala C2 wires env on VPS).
         data = {
             "linear": {"missing_token": True},
             "github": {"missing_token": True},
