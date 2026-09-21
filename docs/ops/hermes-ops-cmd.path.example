@@ -1,0 +1,12 @@
+[Unit]
+Description=Hermes Ops — kick tick when phone queues a command
+Documentation=docs/ops/HERMES-ENGINEER-SECRETS.md
+
+[Path]
+PathChanged=/opt/akademia/data/ops-cmd.json
+PathModified=/opt/akademia/data/ops-cmd.json
+Unit=hermes-ops.service
+MakeDirectory=true
+
+[Install]
+WantedBy=paths.target
