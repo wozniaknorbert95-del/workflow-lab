@@ -9,14 +9,16 @@ from typing import Any
 
 from . import policy
 from .github import GitHubOps
+from .live_enrich import build_approval, enrich_live
 from .router import LANE_AUTOPILOT, LANE_LOCAL, LANE_MANUAL, classify_issue, split_lanes
-from .status_cache import build_status, write_status
-from .telemetry import OPS_MAX_CONCURRENT, append_event, over_daily_cap, today_stats
+from .status_cache import build_status
+from .telemetry import OPS_MAX_CONCURRENT, append_event, over_daily_cap, run_all_enabled
 
 LOCK_PATH = Path(os.environ.get("HERMES_OPS_LOCK", "data/hermes-ops-lock.json"))
 CMD_PATH = Path(os.environ.get("HERMES_OPS_CMD", "data/ops-cmd.json"))
 STATE_PATH = Path(os.environ.get("HERMES_OPS_STATE", "data/hermes-ops-state.json"))
 TTL_MIN = int(os.environ.get("OPS_TTL_MIN", "15"))
+READ_TOKEN = os.environ.get("GITHUB_ENGINEER_TOKEN") or os.environ.get("GITHUB_OPS_WRITE", "")
 
 
 class ConcurrentError(RuntimeError):
@@ -33,14 +35,17 @@ class Engine:
         lock_path: Path | None = None,
         ledger: Path | None = None,
         state_path: Path | None = None,
+        github_read_token: str | None = None,
     ) -> None:
         self.github = github or GitHubOps()
-        self.mode = mode
+        self.mode = mode if mode in policy.ALLOWED_MODES else "MANUAL"
         self.engine_state = "PAUSED"
         self.lock_path = lock_path or LOCK_PATH
         self.state_path = state_path or Path(os.environ.get("HERMES_OPS_STATE", str(STATE_PATH)))
         self.ledger = ledger
         self.live: dict[str, Any] | None = None
+        self.github_read_token = (github_read_token if github_read_token is not None else READ_TOKEN).strip()
+        self.worker = policy.default_worker()
 
     def _lock(self) -> dict[str, Any]:
         if not self.lock_path.is_file():
@@ -81,7 +86,7 @@ class Engine:
         if not isinstance(data, dict):
             return
         mode = str(data.get("mode") or "").upper()
-        if mode in ("MANUAL", "AUTOPILOT"):
+        if mode in policy.ALLOWED_MODES:
             self.mode = mode
         engine = str(data.get("engine") or "").upper()
         if engine in ("PAUSED", "STOPPED", "RUNNING", "UNKNOWN"):
@@ -108,8 +113,11 @@ class Engine:
                 if str(issue.get("id") or issue.get("identifier") or "") == wanted:
                     return issue
             return None
-        lanes = split_lanes(issues, mode=self.mode)
-        queue = lanes[LANE_AUTOPILOT] if self.mode == "AUTOPILOT" else lanes[LANE_MANUAL]
+        lanes = split_lanes(issues, mode=self.mode if self.mode != "SUPERVISED" else "AUTOPILOT")
+        if self.mode == "MANUAL":
+            queue = lanes[LANE_MANUAL]
+        else:
+            queue = lanes[LANE_AUTOPILOT]
         if not queue:
             return None
         target = str(queue[0].get("id") or "")
@@ -120,23 +128,62 @@ class Engine:
 
     def pause(self) -> dict[str, Any]:
         self.engine_state = "PAUSED"
-        append_event({"kind": "paused"}, self.ledger)
+        append_event({"kind": "paused", "result": "paused", "agent": self.worker}, self.ledger)
         self.save_state()
         return {"ok": True, "engine": self.engine_state}
 
     def stop(self) -> dict[str, Any]:
         self.engine_state = "STOPPED"
         self._clear_lock()
-        append_event({"kind": "stopped"}, self.ledger)
+        append_event({"kind": "stopped", "result": "stopped", "agent": self.worker}, self.ledger)
         self.save_state()
         return {"ok": True, "engine": self.engine_state}
 
-    def run_next(self, issue: dict[str, Any]) -> dict[str, Any]:
+    def take_over(self, issue: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Pause + mark live issue as local (zero @cursor)."""
+        self.pause()
+        issue_id = str((issue or {}).get("id") or (self.live or {}).get("issue") or self._lock().get("issue_id") or "")
+        self._clear_lock()
+        self.live = {
+            "issue": issue_id,
+            "action": "take_over",
+            "worker": self.worker,
+            "status": "PAUSED",
+            "step": None,
+            "message": "Take over — zrób na laptopie. Zero @cursor.",
+        }
+        append_event(
+            {
+                "kind": "take_over",
+                "issue": issue_id,
+                "agent": self.worker,
+                "result": "local",
+            },
+            self.ledger,
+        )
+        self.save_state()
+        return {"ok": True, "engine": "PAUSED", "issue": issue_id, "lane": LANE_LOCAL}
+
+    def set_mode(self, mode: str) -> dict[str, Any]:
+        mode = str(mode or "").upper()
+        if mode not in policy.ALLOWED_MODES:
+            return {"ok": False, "code": 400, "error": "bad_mode"}
+        self.mode = mode
+        if mode == "MANUAL" and self.engine_state == "RUNNING":
+            self.engine_state = "PAUSED"
+        if mode in ("AUTOPILOT", "SUPERVISED") and self.engine_state == "PAUSED":
+            pass  # Dowódca taps Start / Run next to go RUNNING
+        self.save_state()
+        append_event({"kind": "mode", "result": mode, "agent": self.worker}, self.ledger)
+        return {"ok": True, "mode": self.mode}
+
+    def run_next(self, issue: dict[str, Any], *, fixture: dict[str, Any] | None = None) -> dict[str, Any]:
         if policy.allow_deploy("run_next")[0]:
             return {"ok": False, "code": 403, "error": policy.DEPLOY_DENIED}
         if "deploy" in json.dumps(issue).lower():
             return {"ok": False, "code": 403, "error": policy.DEPLOY_DENIED}
-        lane = classify_issue(issue, mode=self.mode)
+        route_mode = "AUTOPILOT" if self.mode == "SUPERVISED" else self.mode
+        lane = classify_issue(issue, mode=route_mode)
         if lane == LANE_LOCAL:
             return {"ok": False, "code": 403, "error": policy.LOCAL_ONLY}
         ok, code, reason = policy.allow_cursor_comment(issue, mode=self.mode)
@@ -152,43 +199,108 @@ class Engine:
         if over_daily_cap(self.ledger):
             return {"ok": False, "code": 429, "error": "daily_cap"}
         issue_id = str(issue.get("id") or "")
-        self._write_lock({"issue_id": issue_id, "started": time.time(), "repo": issue.get("repo")})
+        started = time.time()
+        self._write_lock(
+            {
+                "issue_id": issue_id,
+                "started": started,
+                "repo": issue.get("repo"),
+                "pr": issue.get("github_number"),
+            }
+        )
         self.engine_state = "RUNNING"
-        self.live = {"step": 2, "issue": issue_id, "action": "@cursor"}
         repo = str(issue.get("repo") or "workflow-lab")
         number = int(issue.get("github_number") or 0)
         commented = {"ok": True, "skipped": True}
         if number:
             commented = self.github.comment_cursor(repo, number)
+        self.live = enrich_live(
+            issue=issue,
+            lock=self._lock(),
+            worker=self.worker,
+            token=self.github_read_token,
+            fixture=fixture,
+            started=started,
+        )
         append_event(
-            {"kind": "run_next", "issue": issue_id, "repo": repo, "result": "started"},
+            {
+                "kind": "run_next",
+                "issue": issue_id,
+                "agent": self.worker,
+                "model": None,
+                "repo": repo,
+                "pr": number or None,
+                "result": "started",
+                "input_tokens": None,
+                "output_tokens": None,
+                "cost": None,
+                "duration": None,
+                "tests": None,
+                "retries": 0,
+            },
             self.ledger,
         )
         self.save_state()
         return {"ok": True, "queued": issue_id, "github": commented}
 
-    def maybe_merge(self, repo: str, pull_number: int, checks_green: bool, issue: dict[str, Any] | None = None) -> dict[str, Any]:
+    def run_all(self, issues: list[dict[str, Any]]) -> dict[str, Any]:
+        ok, code, reason = policy.allow_run_all(run_all_enabled())
+        if not ok:
+            return {"ok": False, "code": code, "error": reason}
+        if over_daily_cap(self.ledger):
+            return {"ok": False, "code": 429, "error": "daily_cap"}
+        route_mode = "AUTOPILOT" if self.mode in ("AUTOPILOT", "SUPERVISED") else "MANUAL"
+        lanes = split_lanes(issues, mode=route_mode)
+        queue = lanes[LANE_AUTOPILOT] if route_mode == "AUTOPILOT" else lanes[LANE_MANUAL]
+        if not queue:
+            return {"ok": False, "code": 404, "error": "empty_queue"}
+        # Still one concurrent — queue first only; rest wait next ticks.
+        picked = self.pick_next(issues, str(queue[0].get("id") or ""))
+        if not picked:
+            return {"ok": False, "code": 404, "error": "empty_queue"}
+        result = self.run_next(picked)
+        result["run_all_queued"] = len(queue)
+        return result
+
+    def maybe_merge(
+        self, repo: str, pull_number: int, checks_green: bool, issue: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         if not checks_green:
             return {"ok": False, "code": 409, "error": "ci_not_green"}
         result = self.github.merge_pull(repo, pull_number, checks_green, issue)
         kind = "merged" if result.get("ok") else "failed"
-        append_event({"kind": kind, "repo": repo, "pr": pull_number}, self.ledger)
+        append_event(
+            {
+                "kind": kind,
+                "repo": repo,
+                "pr": pull_number,
+                "issue": (issue or {}).get("id"),
+                "agent": self.worker,
+                "result": kind,
+                "input_tokens": None,
+                "output_tokens": None,
+                "cost": None,
+            },
+            self.ledger,
+        )
         if result.get("ok"):
             self._clear_lock()
             self.live = None
-            if self.mode != "AUTOPILOT":
+            if self.mode == "MANUAL":
                 self.engine_state = "PAUSED"
             self.save_state()
         return result
 
     def tick(self, issues: list[dict[str, Any]]) -> dict[str, Any]:
-        lanes = split_lanes(issues, mode=self.mode)
+        route_mode = "AUTOPILOT" if self.mode in ("AUTOPILOT", "SUPERVISED") else self.mode
+        lanes = split_lanes(issues, mode=route_mode)
         if self.engine_state in ("PAUSED", "STOPPED"):
             return {"ok": True, "skipped": self.engine_state, "lanes": lanes}
-        if self.mode != "AUTOPILOT":
+        if self.mode == "MANUAL":
             return {"ok": True, "skipped": "MANUAL", "lanes": lanes}
         if self.busy():
             return {"ok": True, "skipped": "busy", "lanes": lanes}
+        # SUPERVISED: never auto-start HITL (already local). Autopilot queue only.
         queue = lanes[LANE_AUTOPILOT]
         if not queue:
             return {"ok": True, "skipped": "empty", "lanes": lanes}
@@ -198,12 +310,45 @@ class Engine:
                 picked = raw
                 break
         if not picked:
-            picked = {"id": queue[0]["id"], "labels": ["agent"], "repo": queue[0].get("repo") or "workflow-lab"}
+            picked = {
+                "id": queue[0]["id"],
+                "labels": ["agent"],
+                "repo": queue[0].get("repo") or "workflow-lab",
+            }
         return self.run_next(picked)
 
+    def refresh_live(self, issues: list[dict[str, Any]], *, fixture: dict[str, Any] | None = None) -> None:
+        lock = self._lock()
+        issue_id = str(lock.get("issue_id") or (self.live or {}).get("issue") or "")
+        if not issue_id:
+            return
+        match = next(
+            (i for i in issues if str(i.get("id") or i.get("identifier") or "") == issue_id),
+            {"id": issue_id, "repo": lock.get("repo"), "github_number": lock.get("pr")},
+        )
+        self.live = enrich_live(
+            issue=match,
+            lock=lock,
+            worker=self.worker,
+            token=self.github_read_token,
+            fixture=fixture,
+            started=float(lock.get("started") or 0) or None,
+        )
+
     def status_payload(self, issues: list[dict[str, Any]]) -> dict[str, Any]:
-        lanes = split_lanes(issues, mode=self.mode)
+        route_mode = "AUTOPILOT" if self.mode == "SUPERVISED" else self.mode
+        lanes = split_lanes(issues, mode=route_mode if self.mode != "MANUAL" else "MANUAL")
+        if self.mode == "MANUAL":
+            lanes = split_lanes(issues, mode="MANUAL")
+        elif self.mode == "SUPERVISED":
+            lanes = split_lanes(issues, mode="AUTOPILOT")
         engine = self.engine_state or "UNKNOWN"
+        next_issue = None
+        if self.mode == "MANUAL" and lanes.get(LANE_MANUAL):
+            next_issue = lanes[LANE_MANUAL][0]
+        elif lanes.get(LANE_AUTOPILOT):
+            next_issue = lanes[LANE_AUTOPILOT][0]
+        approval = build_approval(lanes, self.live)
         return build_status(
             mode=self.mode,
             engine=engine,
@@ -211,6 +356,10 @@ class Engine:
             live=self.live,
             reason="vps_timer",
             ledger=self.ledger,
+            next_issue=next_issue,
+            approval=approval,
+            worker=self.worker,
+            run_all=run_all_enabled(),
         )
 
 

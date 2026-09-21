@@ -21,21 +21,30 @@ def build_status(
     reason: str = "cache",
     ledger: Path | None = None,
     updated_at: str | None = None,
+    next_issue: dict[str, Any] | None = None,
+    approval: list[dict[str, Any]] | None = None,
+    worker: str = "cursor",
+    run_all: bool = False,
 ) -> dict[str, Any]:
     status = engine or "UNKNOWN"
     if engine in (None, "", "UNKNOWN"):
         status = "UNKNOWN"
     if str(status).upper() == "GREEN" and str(engine).upper() in ("UNKNOWN", "PAUSED", ""):
         status = engine or "UNKNOWN"
+    today = today_stats(ledger)
     return {
         "ok": True,
         "mode": mode,
         "engine": engine or "UNKNOWN",
+        "worker": worker,
         "step": (live or {}).get("step"),
         "status": status or "UNKNOWN",
         "lanes": lanes or {"autopilot": [], "manual": [], "local": []},
+        "next": next_issue,
         "live": live,
-        "today": today_stats(ledger),
+        "approval": approval or [],
+        "today": today,
+        "run_all_enabled": bool(run_all),
         "reason": reason,
         "updated_at": updated_at or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }

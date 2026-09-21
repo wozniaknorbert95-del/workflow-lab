@@ -7,6 +7,8 @@ ENV_DIR="${ENV_DIR:-/etc/workflow-lab}"
 ENV_FILE="${ENV_DIR}/hermes-engineer.env"
 AKADEMIA_DATA="${AKADEMIA_DATA:-/opt/akademia/data}"
 BRANCH="${BRANCH:-main}"
+# phone-loop stays as optional watchdog log; S1–S6 now live inside hermes-ops cache.
+KEEP_PHONE_LOOP="${KEEP_PHONE_LOOP:-1}"
 
 mkdir -p "$ENV_DIR" "$TARGET/data" "$AKADEMIA_DATA"
 chmod 700 "$ENV_DIR"
@@ -28,6 +30,7 @@ GITHUB_OPS_WRITE=
 OPS_MODE=MANUAL
 OPS_MAX_CONCURRENT=1
 OPS_MAX_RUNS_PER_DAY=8
+OPS_RUN_ALL=0
 EOF
   chmod 600 "$ENV_FILE"
   echo "UWAGA: utworzono $ENV_FILE — wklej LINEAR_OPS_READ i GITHUB_OPS_WRITE"
@@ -35,6 +38,7 @@ else
   grep -q '^LINEAR_OPS_READ=' "$ENV_FILE" || printf '\nLINEAR_OPS_READ=\n' >>"$ENV_FILE"
   grep -q '^GITHUB_OPS_WRITE=' "$ENV_FILE" || printf '\nGITHUB_OPS_WRITE=\n' >>"$ENV_FILE"
   grep -q '^OPS_MODE=' "$ENV_FILE" || printf '\nOPS_MODE=MANUAL\n' >>"$ENV_FILE"
+  grep -q '^OPS_RUN_ALL=' "$ENV_FILE" || printf '\nOPS_RUN_ALL=0\n' >>"$ENV_FILE"
   chmod 600 "$ENV_FILE"
 fi
 
@@ -46,9 +50,17 @@ systemctl enable hermes-ops.timer
 systemctl restart hermes-ops.timer
 systemctl start hermes-ops.service || true
 
+if [[ "$KEEP_PHONE_LOOP" == "1" ]]; then
+  echo "INFO: hermes-phone-loop.timer zostaje jako watchdog logu (S1–S6 i tak w ops-status.json)."
+else
+  systemctl disable --now hermes-phone-loop.timer 2>/dev/null || true
+  echo "INFO: hermes-phone-loop.timer wyłączony (KEEP_PHONE_LOOP=0)."
+fi
+
 echo "OK: hermes-ops.timer → $AKADEMIA_DATA/ops-status.json"
 if ! grep -q '^LINEAR_OPS_READ=.\+' "$ENV_FILE"; then
   echo "UWAGA: LINEAR_OPS_READ pusty — /ops pokaże UNKNOWN (fail-closed), nie pustą zieloną kolejkę."
+  echo "  Uzupełnij: $ENV_FILE  potem: systemctl start hermes-ops.service"
 fi
 if ! grep -q '^GITHUB_OPS_WRITE=.\+' "$ENV_FILE"; then
   echo "UWAGA: GITHUB_OPS_WRITE pusty — Run next / merge nie ruszy. Status i kolejka Linear i tak mogą żyć."

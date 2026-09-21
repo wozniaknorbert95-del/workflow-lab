@@ -6,6 +6,8 @@ from typing import Any
 ALLOWED_REPOS = ("workflow-lab", "dsaas-platform-main")
 LOCAL_ONLY = "LOCAL_ONLY"
 DEPLOY_DENIED = "ZASADA_11"
+ALLOWED_MODES = ("MANUAL", "AUTOPILOT", "SUPERVISED")
+WORKER_V1 = "cursor"
 
 
 def _labels(issue: dict[str, Any]) -> set[str]:
@@ -40,8 +42,15 @@ def allow_cursor_comment(issue: dict[str, Any], mode: str = "AUTOPILOT") -> tupl
         return False, 403, LOCAL_ONLY
     if "agent" not in labels:
         return False, 403, LOCAL_ONLY
-    if mode not in ("MANUAL", "AUTOPILOT"):
+    if mode not in ALLOWED_MODES:
         return False, 400, "bad_mode"
+    # SUPERVISED: same as AUTOPILOT for start; stop happens on HITL labels (already local).
+    return True, 200, "ok"
+
+
+def allow_run_all(enabled: bool) -> tuple[bool, int, str]:
+    if not enabled:
+        return False, 403, "run_all_disabled"
     return True, 200, "ok"
 
 
@@ -52,3 +61,7 @@ def allow_deploy(_action: str | None = None) -> tuple[bool, int, str]:
 def has_workflow_dispatch_deploy() -> bool:
     """Orchestrator must not grow a production dispatch path."""
     return False
+
+
+def default_worker() -> str:
+    return WORKER_V1
