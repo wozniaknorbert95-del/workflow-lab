@@ -16,12 +16,22 @@ from hermes_ops.live_enrich import build_approval, enrich_live
 from hermes_ops.orchestrator import Engine
 from hermes_ops.policy import allow_deploy, allow_merge, allow_run_all, has_workflow_dispatch_deploy
 from hermes_ops.router import LANE_AUTOPILOT, LANE_LOCAL, LANE_MANUAL, classify_issue, load_fixture, split_lanes
+from hermes_ops.ops_token_validate import validate_github_ops_write, validate_linear_ops_read
 from hermes_ops.telemetry import append_event, redact, run_all_enabled, today_stats
 from hermes_ops.live_enrich import _load_phone_loop
 
 
 def main() -> int:
     errors: list[str] = []
+    ok, reason = validate_github_ops_write("gho_OAUTH")
+    if ok or reason != "reject_gho_oauth":
+        errors.append(f"anty-gho_: expect reject, got {ok} {reason}")
+    ok, _ = validate_github_ops_write("github_pat_testtokenvaluexx")
+    if not ok:
+        errors.append("github_pat_ powinien przejść walidację kształtu")
+    ok, _ = validate_linear_ops_read("lin_api_testtokenvaluexx")
+    if not ok:
+        errors.append("lin_api_ powinien przejść walidację kształtu")
     fixture = ROOT / "scripts" / "fixtures" / "hermes-ops" / "labels_three.json"
     issues = load_fixture(fixture)
     load_phone_fixture = _load_phone_loop().load_fixture
