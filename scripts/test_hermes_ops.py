@@ -170,9 +170,28 @@ def main() -> int:
         if mapped.get("github_number") != 9:
             errors.append(f"attachment pull number oczekiwano 9, jest {mapped.get('github_number')}")
 
-        empty = LinearOps(token="")
+        empty = LinearOps(token="", queue_file=tmp_path / "no-queue.json")
         if empty.list_queue() or empty.last_error != "missing_LINEAR_OPS_READ":
             errors.append(f"brak tokenu Linear ma być UNKNOWN, jest {empty.last_error} {empty.list_queue()}")
+
+        queue_src = ROOT / "scripts" / "fixtures" / "hermes-ops" / "linear-queue-open.json"
+        from_file = LinearOps(token="", queue_file=queue_src)
+        filed = from_file.list_queue()
+        if from_file.last_error or from_file.source != "queue_file" or len(filed) < 5:
+            errors.append(f"queue_file fallback broken: err={from_file.last_error} src={from_file.source} n={len(filed)}")
+        if not any(i.get("id") == "QUI-61" for i in filed):
+            errors.append("queue_file ma zawierać QUI-61")
+
+        from hermes_ops.notify import build_payload as push_payload, should_alert
+        from hermes_ops.router import active_agents_from, attach_lane_progress
+
+        if not should_alert(mode="SUPERVISED", lanes={"local": [{"id": "QUI-40"}], "autopilot": [], "manual": []}, live=None, engine="PAUSED"):
+            errors.append("SUPERVISED+HITL ma alertować push")
+        if should_alert(mode="MANUAL", lanes={"local": [{"id": "QUI-40"}], "autopilot": [], "manual": []}, live=None, engine="PAUSED"):
+            errors.append("MANUAL nie powinien auto-push HITL")
+        pp = push_payload(lanes={"local": [{"id": "QUI-40", "title": "hitl"}], "autopilot": [], "manual": []}, live=None)
+        if "HITL" not in pp.get("title", ""):
+            errors.append(f"push title HITL: {pp}")
 
         state_file = tmp_path / "state.json"
         paused = Engine(
@@ -206,12 +225,33 @@ def main() -> int:
             state_path=tmp_path / "state3.json",
         )
         take.engine_state = "RUNNING"
-        take.live = {"issue": "QUI-201", "step": 2}
+        take.live = {"issue": "QUI-201", "step": 2, "title": "agent", "progress": {"bar": "██░░░░", "passed": 2, "total": 6}}
         tot = take.take_over(issues[0])
         if tot.get("engine") != "PAUSED" or take.engine_state != "PAUSED":
             errors.append(f"take_over ma Pause, jest {tot}")
         if take.live and take.live.get("action") != "take_over":
             errors.append("take_over live.action")
+
+        take.live = {
+            "issue": "QUI-201",
+            "title": "agent",
+            "step": 2,
+            "status": "RUNNING",
+            "progress": {"bar": "██░░░░", "passed": 2, "total": 6},
+            "worker": "cursor",
+        }
+        take.engine_state = "RUNNING"
+        take._write_lock({"issue_id": "QUI-201", "started": 1, "repo": "workflow-lab"})
+        st = take.status_payload(issues)
+        if not st.get("active_agents"):
+            errors.append("active_agents empty while RUNNING live")
+        lane_prog = attach_lane_progress(st.get("lanes") or {}, take.live)
+        auto_rows = lane_prog.get("autopilot") or []
+        if auto_rows and str(auto_rows[0].get("id")) == "QUI-201" and not auto_rows[0].get("progress"):
+            errors.append("lane progress not attached to live issue")
+        agents = active_agents_from(take.live, take._lock(), "cursor")
+        if not agents or agents[0].get("id") != "QUI-201":
+            errors.append(f"active_agents_from: {agents}")
 
         mode_ok = take.set_mode("SUPERVISED")
         if not mode_ok.get("ok") or take.mode != "SUPERVISED":
