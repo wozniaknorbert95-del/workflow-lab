@@ -50,3 +50,4 @@ jobs:
         run: |
           python scripts/test_phone_loop_status.py
           python scripts/hermes-operator-brief.py --self-test
+          python scripts/test_hermes_ops.py

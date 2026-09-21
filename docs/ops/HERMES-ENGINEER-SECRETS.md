@@ -2,13 +2,17 @@
 
 **Zasada:** nigdy kopiuj keyring `gh` z laptopa. Osobny fine-grained PAT tylko na VPS.
 
-## PAT GitHub (read-only)
+## PAT GitHub — write (Hermes Ops, 2026-09-21)
 
-- Scope: Contents **read**, Pull requests **read**, Checks **read**, Actions **read**
-- **Bez** merge, **bez** workflow write
-- Expiry: 90 dni — rotacja w kalendarzu
-- Plik: `/etc/workflow-lab/hermes-engineer.env` (chmod **600**, nie w git)
-- Kanarek: `gh api` GET checks OK; `gh pr merge` → **403**
+- Env: `GITHUB_OPS_WRITE` (chmod **600**, nie w git). Fine-grained, **oba** repo: `workflow-lab` + `dsaas-platform-main`.
+- Scope: Pull requests **read+write** (merge squash), Issues **write** (komentarz `@cursor`). **Bez** Actions write, **bez** `workflow_dispatch` production.
+- Kanarek: merge zielonego PR w teście policy = **200 allow**; `workflow_dispatch` deploy **nie istnieje** w orchestratorze (`has_workflow_dispatch_deploy() is False`).
+- Rotacja: 90 dni. Blast radius = dwa repo — świadomie.
+
+Env kolejki: `LINEAR_OPS_READ` (kolejka, bez treści opisu do LLM). `GITHUB_ENGINEER_READ` = status (może być ten sam App). Capy: `OPS_MAX_CONCURRENT=1`, `OPS_MAX_RUNS_PER_DAY=8`.
+
+**Zero deploy z timera.** Zasada 11.
+
 
 ## Linear (read, redakcja)
 

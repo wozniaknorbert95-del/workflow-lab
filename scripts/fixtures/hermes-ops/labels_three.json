@@ -1,0 +1,30 @@
+{
+  "issues": [
+    {
+      "id": "QUI-201",
+      "title": "docs-only gym loop",
+      "repo": "workflow-lab",
+      "github_number": 88,
+      "status": "Ready",
+      "labels": ["agent"],
+      "url": "https://linear.app/quietforge/issue/QUI-201"
+    },
+    {
+      "id": "QUI-202",
+      "title": "platform AC complete",
+      "repo": "dsaas-platform-main",
+      "github_number": 99,
+      "status": "Ready",
+      "labels": ["agent"],
+      "url": "https://linear.app/quietforge/issue/QUI-202"
+    },
+    {
+      "id": "QUI-203",
+      "title": "needs human on laptop",
+      "repo": "dsaas-platform-main",
+      "status": "Human review",
+      "labels": ["hitl:approval-required"],
+      "url": "https://linear.app/quietforge/issue/QUI-203"
+    }
+  ]
+}
