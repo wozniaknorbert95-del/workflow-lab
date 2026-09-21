@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from hermes_ops.linear import LinearOps  # noqa: E402
+from hermes_ops.notify import maybe_supervised_push  # noqa: E402
 from hermes_ops.orchestrator import Engine, consume_cmd  # noqa: E402
 from hermes_ops.policy import ALLOWED_MODES, has_workflow_dispatch_deploy  # noqa: E402
 from hermes_ops.status_cache import write_status  # noqa: E402
@@ -27,6 +28,7 @@ def main() -> int:
         choices=ALLOWED_MODES,
     )
     parser.add_argument("--phone-fixture", help="phone-loop fixture name for live S1–S6 tests")
+    parser.add_argument("--no-push", action="store_true", help="skip SUPERVISED web push")
     args = parser.parse_args()
     if has_workflow_dispatch_deploy():
         print("FAIL: orchestrator grew workflow_dispatch deploy", file=sys.stderr)
@@ -41,12 +43,19 @@ def main() -> int:
         raw = json.loads(Path(args.fixture).read_text(encoding="utf-8"))
         issues = raw.get("issues") if isinstance(raw, dict) else raw
         issues = list(issues or [])
+        ops.source = "fixture"
     else:
         issues = ops.list_queue()
     reason = "vps_timer"
+    if ops.source == "queue_file":
+        reason = "queue_file"
     if ops.last_error:
         engine.engine_state = "UNKNOWN"
         reason = ops.last_error
+    elif engine.engine_state == "UNKNOWN" and ops.source in ("queue_file", "linear_api", "fixture", "fetch", "arg"):
+        # Previous fail-closed UNKNOWN cleared once queue has real issues again.
+        engine.engine_state = "PAUSED"
+        engine.save_state()
 
     phone_fx = None
     if args.phone_fixture:
@@ -109,11 +118,27 @@ def main() -> int:
     if ops.last_error:
         payload["engine"] = "UNKNOWN"
         payload["status"] = "UNKNOWN"
+    if not args.no_push and not ops.last_error:
+        push_result = maybe_supervised_push(
+            mode=engine.mode,
+            lanes=payload.get("lanes") or {},
+            live=payload.get("live"),
+            engine=str(payload.get("engine") or ""),
+        )
+        payload["push"] = {k: push_result.get(k) for k in ("ok", "skipped", "queued") if k in push_result}
     out = Path(args.status_out) if args.status_out else None
     write_status(payload, out)
     print(
         json.dumps(
-            {"ok": True, "wrote": True, "engine": payload.get("engine"), "mode": payload.get("mode"), "reason": reason},
+            {
+                "ok": True,
+                "wrote": True,
+                "engine": payload.get("engine"),
+                "mode": payload.get("mode"),
+                "reason": reason,
+                "source": ops.source,
+                "active_agents": len(payload.get("active_agents") or []),
+            },
             ensure_ascii=False,
         )
     )

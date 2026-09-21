@@ -1,0 +1,123 @@
+{
+  "source": "mcp_bootstrap",
+  "updated_at": "2026-09-21T18:00:00Z",
+  "issues": [
+    {
+      "id": "QUI-61",
+      "title": "[F-N27] P0: Taca i działy właściciela — tylko backend QuietForge, zero seed/symulacji",
+      "url": "https://linear.app/quietforge/issue/QUI-61/f-n27-p0-taca-i-dzialy-wlasciciela-tylko-backend-quietforge-zero",
+      "status": "AI review",
+      "labels": ["agent", "value:client-delivery", "work:bug", "risk:production", "area:dashboard"],
+      "repo": "dsaas-platform-main",
+      "project": "dsaas-platform-main"
+    },
+    {
+      "id": "QUI-51",
+      "title": "F-N21 (P2): qf-queue-doctor.py crashuje na Windows (cp1252)",
+      "url": "https://linear.app/quietforge/issue/QUI-51/f-n21-p2-qf-queue-doctorpy-crashuje-na-windows-cp1252-lokalna-bramka",
+      "status": "Ready",
+      "labels": ["agent", "work:tech-debt", "area:workflow", "value:quality"],
+      "repo": "dsaas-platform-main",
+      "project": "dsaas-platform-main"
+    },
+    {
+      "id": "QUI-45",
+      "title": "[F-N14] P2: fixture SSoT MG-10 — jeden zbiór demo dla Kokpitu i Maszynowni",
+      "url": "https://linear.app/quietforge/issue/QUI-45/f-n14-p2-orr-f-03-b-04-fixture-ssot-mg-10-jeden-zbior-demo-dla-kokpitu",
+      "status": "Ready",
+      "labels": ["agent", "work:tech-debt", "risk:security", "area:workflow", "value:quality"],
+      "repo": "dsaas-platform-main",
+      "project": "dsaas-platform-main"
+    },
+    {
+      "id": "QUI-44",
+      "title": "[F-N13] P2: koszt i tokeny per span/trace — kalibracja + projekcja",
+      "url": "https://linear.app/quietforge/issue/QUI-44/f-n13-p2-orr-c-03-koszt-i-tokeny-per-spantrace-kalibracja-projekcja",
+      "status": "Ready",
+      "labels": ["agent", "work:tech-debt", "area:workflow", "value:quality"],
+      "repo": "dsaas-platform-main",
+      "project": "dsaas-platform-main"
+    },
+    {
+      "id": "QUI-43",
+      "title": "[F-N12] P2: brand-kit/* martwe zasoby (6 plików, zero konsumenta)",
+      "url": "https://linear.app/quietforge/issue/QUI-43/f-n12-p2-brand-kit-martwe-zasoby-6-plikow-zero-konsumenta",
+      "status": "Ready",
+      "labels": ["agent", "work:tech-debt", "area:workflow", "value:quality"],
+      "repo": "dsaas-platform-main",
+      "project": "dsaas-platform-main"
+    },
+    {
+      "id": "QUI-41",
+      "title": "[F-N09] P2: graceful fail-closed w _qf_of_input (BLOCK zamiast crash)",
+      "url": "https://linear.app/quietforge/issue/QUI-41/f-n09-p2-graceful-fail-closed-w-qf-of-input-block-zamiast-crash",
+      "status": "Ready",
+      "labels": ["agent", "work:tech-debt", "area:workflow", "value:quality"],
+      "repo": "dsaas-platform-main",
+      "project": "dsaas-platform-main"
+    },
+    {
+      "id": "QUI-33",
+      "title": "[Audyt workflow] P1-3: pre-commit hook nieaktywny (core.hooksPath pusty)",
+      "url": "https://linear.app/quietforge/issue/QUI-33/audyt-workflow-p1-3-pre-commit-hook-nieaktywny-corehookspath-pusty",
+      "status": "Ready",
+      "labels": ["agent", "value:quality", "work:tech-debt", "area:workflow"],
+      "repo": "dsaas-platform-main",
+      "project": "dsaas-platform-main"
+    },
+    {
+      "id": "QUI-31",
+      "title": "[Audyt workflow] P0-1: required checks — tylko gates z 9 uruchamianych",
+      "url": "https://linear.app/quietforge/issue/QUI-31/audyt-workflow-p0-1-required-checks-tylko-gates-z-9-uruchamianych",
+      "status": "Ready",
+      "labels": ["agent", "value:quality", "work:tech-debt", "area:workflow"],
+      "repo": "dsaas-platform-main",
+      "project": "dsaas-platform-main"
+    },
+    {
+      "id": "QUI-34",
+      "title": "[Audyt workflow] P1-4: CODEOWNERS nieegzekwowany (0 wymaganych review)",
+      "url": "https://linear.app/quietforge/issue/QUI-34/audyt-workflow-p1-4-codeowners-nieegzekwowany-0-wymaganych-review",
+      "status": "Ready",
+      "labels": ["blocked", "value:quality", "work:tech-debt", "area:workflow"],
+      "repo": "dsaas-platform-main",
+      "project": "dsaas-platform-main"
+    },
+    {
+      "id": "QUI-32",
+      "title": "[Audyt workflow] P0-2: drift modelu merge — platforma human merge vs lab auto-merge",
+      "url": "https://linear.app/quietforge/issue/QUI-32/audyt-workflow-p0-2-drift-modelu-merge-platforma-human-merge-vs-lab",
+      "status": "Ready",
+      "labels": ["blocked", "value:quality", "work:tech-debt", "area:workflow"],
+      "repo": "dsaas-platform-main",
+      "project": "dsaas-platform-main"
+    },
+    {
+      "id": "QUI-40",
+      "title": "[F-N10] P2: retencja historycznych duplikatów kolejki (append-only)",
+      "url": "https://linear.app/quietforge/issue/QUI-40/f-n10-p2-retencja-historycznych-duplikatow-kolejki-append-only-bez",
+      "status": "Ready",
+      "labels": ["hitl:approval-required", "work:tech-debt", "area:workflow", "value:quality"],
+      "repo": "dsaas-platform-main",
+      "project": "dsaas-platform-main"
+    },
+    {
+      "id": "QUI-46",
+      "title": "[F-N15] P2: human-stopy Dowódcy — GO QF-UX F-09/F-10 + ekspozycja Maszynowni",
+      "url": "https://linear.app/quietforge/issue/QUI-46/f-n15-p2-orr-g-02g-03-human-stopy-dowodcy-go-qf-ux-f-09f-10-ekspozycja",
+      "status": "Ready",
+      "labels": ["hitl:approval-required", "risk:security", "area:workflow", "value:quality", "work:documentation"],
+      "repo": "dsaas-platform-main",
+      "project": "dsaas-platform-main"
+    },
+    {
+      "id": "QUI-47",
+      "title": "[F-N16] P1: backup off-site — jedna etykieta + rozdzielenie blocked_criteria/human_stops",
+      "url": "https://linear.app/quietforge/issue/QUI-47/f-n16-p1-orr-a-05-backup-off-site-jedna-etykieta-rozdzielenie-blocked",
+      "status": "Ready",
+      "labels": ["hitl:approval-required", "work:documentation", "area:workflow", "value:quality"],
+      "repo": "dsaas-platform-main",
+      "project": "dsaas-platform-main"
+    }
+  ]
+}

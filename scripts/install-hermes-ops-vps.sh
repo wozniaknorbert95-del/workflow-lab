@@ -58,9 +58,11 @@ else
 fi
 
 echo "OK: hermes-ops.timer → $AKADEMIA_DATA/ops-status.json"
+grep -q '^LINEAR_OPS_QUEUE_FILE=' "$ENV_FILE" || printf '\nLINEAR_OPS_QUEUE_FILE=%s/linear-queue.json\n' "$TARGET/data" >>"$ENV_FILE"
+chmod 600 "$ENV_FILE"
 if ! grep -q '^LINEAR_OPS_READ=.\+' "$ENV_FILE"; then
-  echo "UWAGA: LINEAR_OPS_READ pusty — /ops pokaże UNKNOWN (fail-closed), nie pustą zieloną kolejkę."
-  echo "  Uzupełnij: $ENV_FILE  potem: systemctl start hermes-ops.service"
+  echo "UWAGA: LINEAR_OPS_READ pusty — użyj queue file ($TARGET/data/linear-queue.json) albo wklej token."
+  echo "  Bootstrap: scripts/push-linear-queue-to-vps.ps1"
 fi
 if ! grep -q '^GITHUB_OPS_WRITE=.\+' "$ENV_FILE"; then
   echo "UWAGA: GITHUB_OPS_WRITE pusty — Run next / merge nie ruszy. Status i kolejka Linear i tak mogą żyć."

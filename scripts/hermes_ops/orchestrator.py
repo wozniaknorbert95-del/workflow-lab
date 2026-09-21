@@ -10,7 +10,15 @@ from typing import Any
 from . import policy
 from .github import GitHubOps
 from .live_enrich import build_approval, enrich_live
-from .router import LANE_AUTOPILOT, LANE_LOCAL, LANE_MANUAL, classify_issue, split_lanes
+from .router import (
+    LANE_AUTOPILOT,
+    LANE_LOCAL,
+    LANE_MANUAL,
+    active_agents_from,
+    attach_lane_progress,
+    classify_issue,
+    split_lanes,
+)
 from .status_cache import build_status
 from .telemetry import OPS_MAX_CONCURRENT, append_event, over_daily_cap, run_all_enabled
 
@@ -349,7 +357,9 @@ class Engine:
         elif lanes.get(LANE_AUTOPILOT):
             next_issue = lanes[LANE_AUTOPILOT][0]
         approval = build_approval(lanes, self.live)
-        return build_status(
+        lanes = attach_lane_progress(lanes, self.live)
+        agents = active_agents_from(self.live, self._lock(), self.worker)
+        payload = build_status(
             mode=self.mode,
             engine=engine,
             lanes=lanes,
@@ -360,7 +370,13 @@ class Engine:
             approval=approval,
             worker=self.worker,
             run_all=run_all_enabled(),
+            active_agents=agents,
         )
+        # Waiting = HITL/local queue size (operator signal), not only ledger.
+        today = dict(payload.get("today") or {})
+        today["waiting"] = max(int(today.get("waiting") or 0), len(lanes.get(LANE_LOCAL) or []))
+        payload["today"] = today
+        return payload
 
 
 def consume_cmd(path: Path | None = None) -> dict[str, Any] | None:

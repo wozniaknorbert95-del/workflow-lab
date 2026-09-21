@@ -25,6 +25,7 @@ def build_status(
     approval: list[dict[str, Any]] | None = None,
     worker: str = "cursor",
     run_all: bool = False,
+    active_agents: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     status = engine or "UNKNOWN"
     if engine in (None, "", "UNKNOWN"):
@@ -42,6 +43,7 @@ def build_status(
         "lanes": lanes or {"autopilot": [], "manual": [], "local": []},
         "next": next_issue,
         "live": live,
+        "active_agents": active_agents or [],
         "approval": approval or [],
         "today": today,
         "run_all_enabled": bool(run_all),
