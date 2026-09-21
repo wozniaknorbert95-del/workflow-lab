@@ -16,18 +16,25 @@ Env kolejki: `LINEAR_OPS_READ` (kolejka, bez treści opisu do LLM). `GITHUB_ENGI
 ## Timer `/ops` (Hermes Ops)
 
 Osobny unit `hermes-ops.timer` (nie mylić z read-only `hermes-phone-loop.timer`).
+S1–S6 z `phone-loop-status` wchodzą do `live.steps[]` w tym samym ticku — telefon nie woła GitHub.
 
 ```bash
 bash scripts/install-hermes-ops-vps.sh
+# Tokeny (interaktywnie, bez logów):
+#   $lin = Read-Host -AsSecureString "LINEAR_OPS_READ"
+#   $gh  = Read-Host -AsSecureString "GITHUB_OPS_WRITE"
+#   .\scripts\push-ops-tokens-to-vps.ps1 -SecureLinear $lin -SecureGithub $gh
 ```
 
 W `/etc/workflow-lab/hermes-engineer.env` (chmod 600):
 
 - `LINEAR_OPS_READ` — Linear API key, **read**. Bez niego cache jest `UNKNOWN` (fail-closed), nie pusta zieleń.
 - `GITHUB_OPS_WRITE` — fine-grained, oba repo, merge+comment. Bez niego kolejka może żyć, Run next nie ruszy.
-- `OPS_MODE=MANUAL` — Autopilot tylko po świadomej zmianie.
+- `OPS_MODE=MANUAL` — albo `AUTOPILOT` / `SUPERVISED` (Supervised = Autopilot + stop na HITL).
+- `OPS_RUN_ALL=0` — Run all tylko gdy świadomie `1`.
 
 Cache: `/opt/akademia/data/ops-status.json` (vault Akademii czyta to samo). Komenda z telefonu: `/opt/akademia/data/ops-cmd.json`.
+`hermes-phone-loop.timer` może zostać jako watchdog logu (`KEEP_PHONE_LOOP=1`).
 
 
 ## Linear (read, redakcja)

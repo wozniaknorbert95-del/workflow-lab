@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Hermes Ops policy + router + merge-both + no-deploy (stdlib)."""
+"""Hermes Ops policy + router + merge-both + no-deploy + live S1–S6 (stdlib)."""
 from __future__ import annotations
 
 import json
+import os
 import sys
 import tempfile
 from pathlib import Path
@@ -11,16 +12,19 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from hermes_ops.github import GitHubOps
+from hermes_ops.live_enrich import build_approval, enrich_live
 from hermes_ops.orchestrator import Engine
-from hermes_ops.policy import allow_deploy, allow_merge, has_workflow_dispatch_deploy
+from hermes_ops.policy import allow_deploy, allow_merge, allow_run_all, has_workflow_dispatch_deploy
 from hermes_ops.router import LANE_AUTOPILOT, LANE_LOCAL, LANE_MANUAL, classify_issue, load_fixture, split_lanes
-from hermes_ops.telemetry import append_event, redact, today_stats
+from hermes_ops.telemetry import append_event, redact, run_all_enabled, today_stats
+from hermes_ops.live_enrich import _load_phone_loop
 
 
 def main() -> int:
     errors: list[str] = []
     fixture = ROOT / "scripts" / "fixtures" / "hermes-ops" / "labels_three.json"
     issues = load_fixture(fixture)
+    load_phone_fixture = _load_phone_loop().load_fixture
     if len(issues) != 3:
         errors.append("fixture 3 etykiet != 3 issues")
 
@@ -46,6 +50,10 @@ def main() -> int:
     if allow_deploy("workflow_dispatch")[0] or has_workflow_dispatch_deploy():
         errors.append("workflow dispatch deploy nie może istnieć w orchestratorze")
 
+    ok, code, reason = allow_run_all(False)
+    if ok or code != 403:
+        errors.append("Run all default OFF — expect 403")
+
     calls: list[tuple] = []
 
     def fake_fetch(method, path, payload):
@@ -59,7 +67,14 @@ def main() -> int:
         tmp_path = Path(tmp)
         ledger = tmp_path / "ledger.jsonl"
         lock = tmp_path / "lock.json"
-        engine = Engine(github=gh, mode="MANUAL", lock_path=lock, ledger=ledger, state_path=tmp_path / "state-main.json")
+        engine = Engine(
+            github=gh,
+            mode="MANUAL",
+            lock_path=lock,
+            ledger=ledger,
+            state_path=tmp_path / "state-main.json",
+            github_read_token="",
+        )
         hitl = issues[2]
         denied = engine.run_next(hitl)
         if denied.get("code") != 403:
@@ -67,9 +82,17 @@ def main() -> int:
         if any("@cursor" in json.dumps(c) for c in calls):
             errors.append("hitl nigdy @cursor — komentarz poszedł")
 
-        first = engine.run_next(issues[0])
+        phone = load_phone_fixture("happy")
+        first = engine.run_next(issues[0], fixture=phone)
         if not first.get("ok"):
             errors.append(f"Run next agent expect ok, got {first}")
+        if not engine.live or not engine.live.get("steps"):
+            errors.append("live musi mieć steps S1–S6 z phone-loop")
+        elif engine.live.get("progress", {}).get("total") != 6:
+            errors.append(f"progress total=6, jest {engine.live.get('progress')}")
+        if engine.live and "api.github.com" in json.dumps(engine.live):
+            errors.append("live nie może zawierać api.github.com")
+
         second = engine.run_next(issues[1])
         if second.get("code") != 409:
             errors.append(f"1 concurrent — drugie Run next oczekiwano 409, jest {second}")
@@ -93,10 +116,26 @@ def main() -> int:
         if not tick.get("ok") and tick.get("code") == 403:
             errors.append(f"autopilot tick: {tick}")
 
-        append_event({"kind": "merged", "repo": "workflow-lab"}, ledger)
+        append_event(
+            {
+                "kind": "merged",
+                "repo": "workflow-lab",
+                "issue": "QUI-201",
+                "agent": "cursor",
+                "input_tokens": None,
+                "output_tokens": None,
+                "cost": None,
+                "result": "merged",
+            },
+            ledger,
+        )
         stats = today_stats(ledger)
         if stats.get("merged", 0) < 1:
             errors.append("Today z ledgeru nie widzi merged")
+        if stats.get("tokens") is not None or stats.get("cost") is not None:
+            # null stays null when no numeric source
+            if stats.get("cost") == 0 or stats.get("tokens") == 0:
+                errors.append("cost/tokens nie mogą być fałszywym zerem bez źródła")
         leaked = redact("token ghp_SECRETBAD and lin_api_X")
         if "ghp_" in leaked or "lin_api_" in leaked:
             errors.append("redakcja sekretów nie działa")
@@ -104,10 +143,12 @@ def main() -> int:
         payload = engine.status_payload(issues)
         if payload.get("status") == "GREEN" and payload.get("engine") == "UNKNOWN":
             errors.append("UNKNOWN pomalowane na zielone")
-        if payload.get("today", {}).get("cost") not in (None, "—", ""):
-            pass  # cost stays None / em-dash at UI
         if "api.github.com" in json.dumps(payload):
             errors.append("status cache nie może zawierać api.github.com")
+        if payload.get("worker") != "cursor":
+            errors.append("worker v1 = cursor")
+        if payload.get("run_all_enabled") is not False and not run_all_enabled():
+            errors.append("run_all_enabled default false")
 
         from hermes_ops.linear import LinearOps, normalize_issue
 
@@ -134,9 +175,21 @@ def main() -> int:
             errors.append(f"brak tokenu Linear ma być UNKNOWN, jest {empty.last_error} {empty.list_queue()}")
 
         state_file = tmp_path / "state.json"
-        paused = Engine(github=gh, mode="AUTOPILOT", lock_path=tmp_path / "lock2.json", ledger=ledger, state_path=state_file)
+        paused = Engine(
+            github=gh,
+            mode="AUTOPILOT",
+            lock_path=tmp_path / "lock2.json",
+            ledger=ledger,
+            state_path=state_file,
+        )
         paused.pause()
-        restored = Engine(github=gh, mode="AUTOPILOT", lock_path=tmp_path / "lock2.json", ledger=ledger, state_path=state_file)
+        restored = Engine(
+            github=gh,
+            mode="AUTOPILOT",
+            lock_path=tmp_path / "lock2.json",
+            ledger=ledger,
+            state_path=state_file,
+        )
         restored.load_state()
         if restored.engine_state != "PAUSED":
             errors.append(f"Pause ma przetrwać tick, jest {restored.engine_state}")
@@ -144,13 +197,57 @@ def main() -> int:
         if not picked or picked.get("id") != "QUI-201":
             errors.append(f"pick_next MANUAL/pierwszy agent: {picked}")
 
+        # F3: take_over + SUPERVISED
+        take = Engine(
+            github=gh,
+            mode="SUPERVISED",
+            lock_path=tmp_path / "lock3.json",
+            ledger=ledger,
+            state_path=tmp_path / "state3.json",
+        )
+        take.engine_state = "RUNNING"
+        take.live = {"issue": "QUI-201", "step": 2}
+        tot = take.take_over(issues[0])
+        if tot.get("engine") != "PAUSED" or take.engine_state != "PAUSED":
+            errors.append(f"take_over ma Pause, jest {tot}")
+        if take.live and take.live.get("action") != "take_over":
+            errors.append("take_over live.action")
+
+        mode_ok = take.set_mode("SUPERVISED")
+        if not mode_ok.get("ok") or take.mode != "SUPERVISED":
+            errors.append(f"set_mode SUPERVISED: {mode_ok}")
+        bad = take.set_mode("HACK")
+        if bad.get("ok"):
+            errors.append("bad mode should fail")
+
+        os.environ.pop("OPS_RUN_ALL", None)
+        # reload module flag is process-start; call policy directly
+        ra = take.run_all(issues)
+        if ra.get("code") != 403:
+            errors.append(f"run_all bez flagi expect 403, jest {ra}")
+
+        live_ci = enrich_live(issue=issues[0], fixture=phone, worker="cursor")
+        cards = build_approval({"local": [issues[2]], "autopilot": [], "manual": []}, live_ci)
+        kinds = {c.get("kind") for c in cards}
+        if "hitl_local" not in kinds:
+            errors.append("approval ma kartę hitl_local")
+        # happy fixture is fully merged PASS step 6 — ci_green_waiting only when checks PASS but not merged
+        mid = dict(phone)
+        mid["merge"] = {"squash_on_main": False}
+        mid["review"] = {"approved": False}
+        live_wait = enrich_live(issue=issues[0], fixture=mid, worker="cursor")
+        cards2 = build_approval({"local": [], "autopilot": [], "manual": []}, live_wait)
+        if not any(c.get("kind") == "ci_green_waiting" for c in cards2):
+            # S4 PASS but S6 not — should show waiting
+            if str((live_wait.get("checks") or {}).get("overall") or "").upper() == "PASS":
+                errors.append(f"approval ci_green_waiting missing: {cards2} live={live_wait.get('status')}")
 
     if errors:
         print("FAIL:")
         for item in errors:
             print(" -", item)
         return 1
-    print("PASS: hermes_ops (Linear router, merge both, deny deploy)")
+    print("PASS: hermes_ops (Linear router, merge both, live S1-S6, take_over, deny deploy)")
     return 0
 
 
