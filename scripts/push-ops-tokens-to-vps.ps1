@@ -125,4 +125,4 @@ $pyB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($py))
 $remote = "export ENV_PATH='$EnvPath' B64='$b64'; echo $pyB64 | base64 -d > /tmp/merge-ops-env.py && python3 /tmp/merge-ops-env.py; rm -f /tmp/merge-ops-env.py"
 ssh -o BatchMode=yes $VpsHost $remote
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-Write-Host "OK: tokeny na VPS (tylko len w logu). Odswiez /ops — oczekuj reason=vps_timer gdy Linear zywy."
+Write-Host "OK: tokens on VPS (lengths only in log). Expect /ops reason=vps_timer when Linear lives."
