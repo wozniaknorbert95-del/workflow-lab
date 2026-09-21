@@ -1,0 +1,17 @@
+[Unit]
+Description=Hermes Ops Linear tick (merge loop, never deploy)
+After=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/workflow-lab/hermes-engineer.env
+Environment=HERMES_OPS_CMD=/opt/akademia/data/ops-cmd.json
+Environment=HERMES_OPS_STATE=/opt/workflow-lab/data/hermes-ops-state.json
+Environment=HERMES_OPS_LOCK=/opt/workflow-lab/data/hermes-ops-lock.json
+Environment=HERMES_OPS_LEDGER=/opt/workflow-lab/data/hermes-ops-ledger.jsonl
+WorkingDirectory=/opt/workflow-lab
+ExecStart=/usr/bin/python3 scripts/hermes-ops-tick.py --status-out /opt/akademia/data/ops-status.json
+# Zero workflow_dispatch / SSH prod. Pause persists in HERMES_OPS_STATE.
+
+[Install]
+WantedBy=multi-user.target

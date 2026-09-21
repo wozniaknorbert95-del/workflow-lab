@@ -59,7 +59,7 @@ def main() -> int:
         tmp_path = Path(tmp)
         ledger = tmp_path / "ledger.jsonl"
         lock = tmp_path / "lock.json"
-        engine = Engine(github=gh, mode="MANUAL", lock_path=lock, ledger=ledger)
+        engine = Engine(github=gh, mode="MANUAL", lock_path=lock, ledger=ledger, state_path=tmp_path / "state-main.json")
         hitl = issues[2]
         denied = engine.run_next(hitl)
         if denied.get("code") != 403:
@@ -108,6 +108,42 @@ def main() -> int:
             pass  # cost stays None / em-dash at UI
         if "api.github.com" in json.dumps(payload):
             errors.append("status cache nie może zawierać api.github.com")
+
+        from hermes_ops.linear import LinearOps, normalize_issue
+
+        mapped = normalize_issue(
+            {
+                "identifier": "QUI-210",
+                "title": "from project",
+                "url": "https://linear.app/quietforge/issue/QUI-210",
+                "state": {"name": "Ready"},
+                "labels": {"nodes": [{"name": "agent"}]},
+                "project": {"name": "dsaas-platform-main"},
+                "attachments": {
+                    "nodes": [{"url": "https://github.com/wozniaknorbert95-del/dsaas-platform-main/pull/9"}]
+                },
+            }
+        )
+        if mapped.get("repo") != "dsaas-platform-main":
+            errors.append(f"project name ma mapować repo, jest {mapped.get('repo')}")
+        if mapped.get("github_number") != 9:
+            errors.append(f"attachment pull number oczekiwano 9, jest {mapped.get('github_number')}")
+
+        empty = LinearOps(token="")
+        if empty.list_queue() or empty.last_error != "missing_LINEAR_OPS_READ":
+            errors.append(f"brak tokenu Linear ma być UNKNOWN, jest {empty.last_error} {empty.list_queue()}")
+
+        state_file = tmp_path / "state.json"
+        paused = Engine(github=gh, mode="AUTOPILOT", lock_path=tmp_path / "lock2.json", ledger=ledger, state_path=state_file)
+        paused.pause()
+        restored = Engine(github=gh, mode="AUTOPILOT", lock_path=tmp_path / "lock2.json", ledger=ledger, state_path=state_file)
+        restored.load_state()
+        if restored.engine_state != "PAUSED":
+            errors.append(f"Pause ma przetrwać tick, jest {restored.engine_state}")
+        picked = paused.pick_next(issues, "")
+        if not picked or picked.get("id") != "QUI-201":
+            errors.append(f"pick_next MANUAL/pierwszy agent: {picked}")
+
 
     if errors:
         print("FAIL:")

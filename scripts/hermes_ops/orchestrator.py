@@ -9,12 +9,13 @@ from typing import Any
 
 from . import policy
 from .github import GitHubOps
-from .router import LANE_AUTOPILOT, LANE_LOCAL, classify_issue, split_lanes
+from .router import LANE_AUTOPILOT, LANE_LOCAL, LANE_MANUAL, classify_issue, split_lanes
 from .status_cache import build_status, write_status
 from .telemetry import OPS_MAX_CONCURRENT, append_event, over_daily_cap, today_stats
 
 LOCK_PATH = Path(os.environ.get("HERMES_OPS_LOCK", "data/hermes-ops-lock.json"))
 CMD_PATH = Path(os.environ.get("HERMES_OPS_CMD", "data/ops-cmd.json"))
+STATE_PATH = Path(os.environ.get("HERMES_OPS_STATE", "data/hermes-ops-state.json"))
 TTL_MIN = int(os.environ.get("OPS_TTL_MIN", "15"))
 
 
@@ -31,11 +32,13 @@ class Engine:
         mode: str = "MANUAL",
         lock_path: Path | None = None,
         ledger: Path | None = None,
+        state_path: Path | None = None,
     ) -> None:
         self.github = github or GitHubOps()
         self.mode = mode
         self.engine_state = "PAUSED"
         self.lock_path = lock_path or LOCK_PATH
+        self.state_path = state_path or Path(os.environ.get("HERMES_OPS_STATE", str(STATE_PATH)))
         self.ledger = ledger
         self.live: dict[str, Any] | None = None
 
@@ -68,15 +71,64 @@ class Engine:
             return False
         return True
 
+    def load_state(self) -> None:
+        if not self.state_path.is_file():
+            return
+        try:
+            data = json.loads(self.state_path.read_text(encoding="utf-8"))
+        except Exception:
+            return
+        if not isinstance(data, dict):
+            return
+        mode = str(data.get("mode") or "").upper()
+        if mode in ("MANUAL", "AUTOPILOT"):
+            self.mode = mode
+        engine = str(data.get("engine") or "").upper()
+        if engine in ("PAUSED", "STOPPED", "RUNNING", "UNKNOWN"):
+            self.engine_state = engine
+        live = data.get("live")
+        if isinstance(live, dict):
+            self.live = live
+
+    def save_state(self) -> None:
+        self.state_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "mode": self.mode,
+            "engine": self.engine_state,
+            "live": self.live,
+        }
+        tmp = self.state_path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp.replace(self.state_path)
+
+    def pick_next(self, issues: list[dict[str, Any]], issue_id: str = "") -> dict[str, Any] | None:
+        wanted = str(issue_id or "")
+        if wanted:
+            for issue in issues:
+                if str(issue.get("id") or issue.get("identifier") or "") == wanted:
+                    return issue
+            return None
+        lanes = split_lanes(issues, mode=self.mode)
+        queue = lanes[LANE_AUTOPILOT] if self.mode == "AUTOPILOT" else lanes[LANE_MANUAL]
+        if not queue:
+            return None
+        target = str(queue[0].get("id") or "")
+        for issue in issues:
+            if str(issue.get("id") or issue.get("identifier") or "") == target:
+                return issue
+        return None
+
     def pause(self) -> dict[str, Any]:
         self.engine_state = "PAUSED"
         append_event({"kind": "paused"}, self.ledger)
+        self.save_state()
         return {"ok": True, "engine": self.engine_state}
 
     def stop(self) -> dict[str, Any]:
         self.engine_state = "STOPPED"
         self._clear_lock()
         append_event({"kind": "stopped"}, self.ledger)
+        self.save_state()
         return {"ok": True, "engine": self.engine_state}
 
     def run_next(self, issue: dict[str, Any]) -> dict[str, Any]:
@@ -112,6 +164,7 @@ class Engine:
             {"kind": "run_next", "issue": issue_id, "repo": repo, "result": "started"},
             self.ledger,
         )
+        self.save_state()
         return {"ok": True, "queued": issue_id, "github": commented}
 
     def maybe_merge(self, repo: str, pull_number: int, checks_green: bool, issue: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -125,6 +178,7 @@ class Engine:
             self.live = None
             if self.mode != "AUTOPILOT":
                 self.engine_state = "PAUSED"
+            self.save_state()
         return result
 
     def tick(self, issues: list[dict[str, Any]]) -> dict[str, Any]:

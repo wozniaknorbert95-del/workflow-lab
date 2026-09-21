@@ -1,0 +1,10 @@
+[Unit]
+Description=Hermes Ops Linear-first timer
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=5min
+Unit=hermes-ops.service
+
+[Install]
+WantedBy=timers.target

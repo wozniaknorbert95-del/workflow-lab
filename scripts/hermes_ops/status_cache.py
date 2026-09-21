@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from pathlib import Path
 from typing import Any
 
@@ -19,13 +20,13 @@ def build_status(
     live: dict[str, Any] | None = None,
     reason: str = "cache",
     ledger: Path | None = None,
+    updated_at: str | None = None,
 ) -> dict[str, Any]:
-    status = engine
-    if str(engine).upper() in ("GREEN",):
-        # UNKNOWN/PAUSED never painted green from missing data.
-        status = engine
+    status = engine or "UNKNOWN"
     if engine in (None, "", "UNKNOWN"):
         status = "UNKNOWN"
+    if str(status).upper() == "GREEN" and str(engine).upper() in ("UNKNOWN", "PAUSED", ""):
+        status = engine or "UNKNOWN"
     return {
         "ok": True,
         "mode": mode,
@@ -36,6 +37,7 @@ def build_status(
         "live": live,
         "today": today_stats(ledger),
         "reason": reason,
+        "updated_at": updated_at or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
 
 
