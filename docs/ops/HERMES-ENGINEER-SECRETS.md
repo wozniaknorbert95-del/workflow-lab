@@ -13,6 +13,22 @@ Env kolejki: `LINEAR_OPS_READ` (kolejka, bez treści opisu do LLM). `GITHUB_ENGI
 
 **Zero deploy z timera.** Zasada 11.
 
+## Timer `/ops` (Hermes Ops)
+
+Osobny unit `hermes-ops.timer` (nie mylić z read-only `hermes-phone-loop.timer`).
+
+```bash
+bash scripts/install-hermes-ops-vps.sh
+```
+
+W `/etc/workflow-lab/hermes-engineer.env` (chmod 600):
+
+- `LINEAR_OPS_READ` — Linear API key, **read**. Bez niego cache jest `UNKNOWN` (fail-closed), nie pusta zieleń.
+- `GITHUB_OPS_WRITE` — fine-grained, oba repo, merge+comment. Bez niego kolejka może żyć, Run next nie ruszy.
+- `OPS_MODE=MANUAL` — Autopilot tylko po świadomej zmianie.
+
+Cache: `/opt/akademia/data/ops-status.json` (vault Akademii czyta to samo). Komenda z telefonu: `/opt/akademia/data/ops-cmd.json`.
+
 
 ## Linear (read, redakcja)
 
