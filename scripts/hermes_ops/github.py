@@ -55,6 +55,9 @@ class GitHubOps:
 
         Linear queue often has github_number=0 (no PR attachment yet). Without this,
         run_next skipped @cursor forever — root cause of QUI-70 'agent never started'.
+
+        Fine-grained PATs often cannot use Search API — skip search, create/find by
+        create-or-comment. Prefer `workflow-lab` when target repo rejects create (403).
         """
         if repo not in ALLOWED_REPOS:
             return {"ok": False, "code": 403, "error": "repo_not_in_policy"}
@@ -64,47 +67,72 @@ class GitHubOps:
         title = str(issue.get("title") or linear_id or "Hermes Ops task").strip()
         number = int(issue.get("github_number") or 0)
         created = False
-        if number <= 0 and linear_id:
-            found = self.find_open_issue_by_marker(repo, linear_id)
-            items = ((found.get("body") or {}).get("items") if found.get("ok") else None) or []
-            if items:
-                number = int(items[0].get("number") or 0)
-        if number <= 0:
+        used_repo = repo
+        created_res: dict[str, Any] = {}
+
+        def _create_on(target: str) -> dict[str, Any]:
             body = (
                 f"Hermes Ops (Linear-first)\n\n"
                 f"- Linear: {linear_id or '?'}\n"
                 f"- URL: {issue.get('url') or ''}\n"
-                f"- Repo: {repo}\n\n"
-                f"Automation: label `agent` + this comment starts Cloud Agent.\n"
+                f"- Target repo: {repo}\n\n"
+                f"@cursor\n\n"
+                f"Automation / Cloud Agent: start from this issue.\n"
                 f"Do not deploy. Merge after green CI.\n"
             )
             gh_title = f"[{linear_id}] {title}" if linear_id else title
-            created_res = self.create_issue(repo, gh_title, body, labels=["agent"])
+            # Prefer agent label; fine-grained tokens may ignore unknown labels.
+            res = self.create_issue(target, gh_title, body, labels=["agent"])
+            if not res.get("ok") and int(res.get("code") or 0) in (403, 422):
+                res = self.create_issue(target, gh_title, body, labels=None)
+            return res
+
+        if number <= 0:
+            created_res = _create_on(used_repo)
+            if not created_res.get("ok") and used_repo != "workflow-lab":
+                used_repo = "workflow-lab"
+                created_res = _create_on(used_repo)
             if not created_res.get("ok"):
                 return {
                     "ok": False,
                     "code": created_res.get("code") or 599,
                     "error": created_res.get("error") or "create_issue_failed",
+                    "detail": created_res.get("detail") or "",
                 }
             number = int(((created_res.get("body") or {}).get("number")) or 0)
             created = True
             if number <= 0:
                 return {"ok": False, "code": 599, "error": "create_issue_no_number"}
         comment_body = f"@cursor\n\nLinear `{linear_id}` — Hermes Ops Start/Run next."
-        commented = self.comment_cursor(repo, number, comment_body)
+        commented = self.comment_cursor(used_repo, number, comment_body)
+        # Some fine-grained PATs can create issues but not comments (403).
+        # Issue body already contains @cursor — treat create as trigger success.
         if not commented.get("ok"):
+            if created:
+                return {
+                    "ok": True,
+                    "issue_number": number,
+                    "created": True,
+                    "commented": False,
+                    "repo": used_repo,
+                    "comment_error": commented.get("error") or "comment_forbidden",
+                    "html_url": ((created_res.get("body") or {}).get("html_url") if created else ""),
+                    "note": "GITHUB_OPS_WRITE cannot comment; @cursor embedded in issue body",
+                }
             return {
                 "ok": False,
                 "code": commented.get("code") or 599,
                 "error": commented.get("error") or "comment_failed",
                 "issue_number": number,
                 "created": created,
+                "repo": used_repo,
             }
         return {
             "ok": True,
             "issue_number": number,
             "created": created,
             "commented": True,
+            "repo": used_repo,
             "html_url": ((commented.get("body") or {}).get("html_url") or ""),
         }
 
