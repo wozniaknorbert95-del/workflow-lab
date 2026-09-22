@@ -32,6 +32,25 @@ def main() -> int:
     ok, _ = validate_linear_ops_read("lin_api_testtokenvaluexx")
     if not ok:
         errors.append("lin_api_ powinien przejść walidację kształtu")
+
+    qui89_map = ROOT / "scripts" / "fixtures" / "qui-89" / "revenue-bridge-event-map.json"
+    qui89_spine = ROOT / "scripts" / "fixtures" / "qui-89" / "lead-spine-schema.json"
+    if qui89_map.is_file():
+        em = json.loads(qui89_map.read_text(encoding="utf-8"))
+        policy = em.get("measurement_policy") or {}
+        if policy.get("revenue_trigger_event") != "invoice.paid":
+            errors.append("qui-89: revenue_trigger_event must be invoice.paid")
+        event_types = [e.get("type") for e in (em.get("events") or [])]
+        if "invoice.paid" not in event_types or "offer.created" not in event_types:
+            errors.append("qui-89: event map missing offer/invoice chain")
+        if len(em.get("tenant_isolation_tests") or []) < 6:
+            errors.append("qui-89: tenant isolation plan needs TI-01..TI-06")
+    if qui89_spine.is_file():
+        spine_raw = qui89_spine.read_text(encoding="utf-8").lower()
+        for banned in ("email", "phone", "address", "nip"):
+            if f'"{banned}"' in spine_raw:
+                errors.append(f"qui-89: spine schema must not define PII field {banned}")
+
     fixture = ROOT / "scripts" / "fixtures" / "hermes-ops" / "labels_three.json"
     issues = load_fixture(fixture)
     load_phone_fixture = _load_phone_loop().load_fixture
