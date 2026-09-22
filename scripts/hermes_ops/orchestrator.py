@@ -230,20 +230,30 @@ class Engine:
                 "error": str(trigger.get("error") or "cursor_trigger_failed"),
             }
         number = int(trigger.get("issue_number") or issue.get("github_number") or 0)
-        # Lock stores GitHub issue number for later enrichment (PR may appear later).
+        # Prefer the repo that actually received @cursor (may fall back to workflow-lab).
+        used_repo = str(trigger.get("repo") or repo)
+        # Newly created tracking issues are NOT PRs — do not feed them into PR enrich.
+        created_issue = bool(trigger.get("created"))
+        existing_pr = int(issue.get("github_number") or 0) if not created_issue else 0
+        # Lock: github_issue = tracking issue; pr = real PR only (0 until agent opens one).
         self._write_lock(
             {
                 "issue_id": issue_id,
                 "started": started,
-                "repo": repo,
-                "pr": number,
+                "repo": used_repo,
+                "pr": existing_pr or None,
                 "github_issue": number,
                 "cursor_triggered": True,
             }
         )
-        commented = {"ok": True, "issue_number": number, "created": trigger.get("created")}
+        commented = {"ok": True, "issue_number": number, "created": trigger.get("created"), "repo": used_repo}
+        enrich_issue = {**issue, "repo": used_repo}
+        if existing_pr > 0:
+            enrich_issue["github_number"] = existing_pr
+        else:
+            enrich_issue.pop("github_number", None)
         self.live = enrich_live(
-            issue={**issue, "github_number": number},
+            issue=enrich_issue,
             lock=self._lock(),
             worker=self.worker,
             token=self.github_read_token,
@@ -257,8 +267,9 @@ class Engine:
                 "issue": issue_id,
                 "agent": self.worker,
                 "model": None,
-                "repo": repo,
-                "pr": number or None,
+                "repo": used_repo,
+                "pr": existing_pr or None,
+                "github_issue": number or None,
                 "result": "started",
                 "input_tokens": None,
                 "output_tokens": None,
@@ -353,8 +364,16 @@ class Engine:
             return
         match = next(
             (i for i in issues if str(i.get("id") or i.get("identifier") or "") == issue_id),
-            {"id": issue_id, "repo": lock.get("repo"), "github_number": lock.get("pr")},
+            {"id": issue_id, "repo": lock.get("repo"), "github_number": lock.get("pr") or 0},
         )
+        # Keep lock.repo (may differ from Linear target after create fallback).
+        if lock.get("repo"):
+            match = {**match, "repo": lock.get("repo")}
+        if lock.get("pr"):
+            match = {**match, "github_number": lock.get("pr")}
+        elif "github_number" in match and not lock.get("pr"):
+            match = {**match}
+            match.pop("github_number", None)
         self.live = enrich_live(
             issue=match,
             lock=lock,
@@ -362,6 +381,9 @@ class Engine:
             token=self.github_read_token,
             fixture=fixture,
             started=float(lock.get("started") or 0) or None,
+            cursor_meta={"ok": True, "issue_number": lock.get("github_issue"), "repo": lock.get("repo")}
+            if lock.get("cursor_triggered")
+            else None,
         )
 
     def status_payload(self, issues: list[dict[str, Any]]) -> dict[str, Any]:

@@ -72,8 +72,13 @@ def enrich_live(
     issue = issue or {}
     lock = lock or {}
     issue_id = str(issue.get("id") or lock.get("issue_id") or "")
-    repo = str(issue.get("repo") or lock.get("repo") or "workflow-lab")
+    # Prefer lock.repo — ensure_cursor may have fallen back to workflow-lab.
+    repo = str(lock.get("repo") or issue.get("repo") or "workflow-lab")
+    # Real PR only (lock.pr); never treat tracking github_issue as a PR.
     pr = int(issue.get("github_number") or lock.get("pr") or 0)
+    github_issue = int(lock.get("github_issue") or 0)
+    if cursor_meta and cursor_meta.get("issue_number") and not github_issue:
+        github_issue = int(cursor_meta.get("issue_number") or 0)
     started_ts = float(started or lock.get("started") or 0)
     duration = int(time.time() - started_ts) if started_ts else None
 
@@ -102,13 +107,19 @@ def enrich_live(
                 "reason": type(exc).__name__,
             }
     else:
-        # Offline / no PR yet — S2 after @cursor is the honest floor.
+        # Offline / tracking issue only — S2 after @cursor is the honest floor.
+        cursor_ok = bool(cursor_meta and cursor_meta.get("ok")) or bool(lock.get("cursor_triggered"))
         evaluated = {
             "step": 2 if issue_id else 0,
             "status": "UNKNOWN" if not issue_id else "PASS",
             "steps": [
-                {"step": 1, "status": "PASS" if issue_id else "UNKNOWN", "evidence": [], "reason": ""},
-                {"step": 2, "status": "PASS" if issue_id else "UNKNOWN", "evidence": [{"kind": "cursor_trigger"}], "reason": ""},
+                {"step": 1, "status": "PASS" if issue_id else "UNKNOWN", "evidence": [{"kind": "linear_issue", "id": issue_id}], "reason": ""},
+                {
+                    "step": 2,
+                    "status": "PASS" if cursor_ok or issue_id else "UNKNOWN",
+                    "evidence": [{"kind": "cursor_trigger", "github_issue": github_issue or None, "repo": repo}],
+                    "reason": "",
+                },
                 {"step": 3, "status": "UNKNOWN", "evidence": [], "reason": "no PR yet"},
                 {"step": 4, "status": "UNKNOWN", "evidence": [], "reason": "checks not available"},
                 {"step": 5, "status": "UNKNOWN", "evidence": [], "reason": "review N/A for merge gate"},
@@ -151,12 +162,24 @@ def enrich_live(
         "run_id": str(agent.get("run_id") or ""),
     }
     if cursor_meta and cursor_meta.get("ok") and not run_url:
+        note = f"@cursor on {repo}#{github_issue or pr}"
+        if cursor_meta.get("created"):
+            note += " (created)"
+        if cursor_meta.get("html_url"):
+            note += f" {cursor_meta.get('html_url')}"
+        elif cursor_meta.get("commented") is False:
+            note += " (body @cursor; comment 403)"
         recent = list(recent) + [
             {
                 "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                "text": f"@cursor on #{pr}" + (" (created)" if cursor_meta.get("created") else ""),
+                "text": note,
             }
         ]
+    gh_issue_url = ""
+    if cursor_meta and cursor_meta.get("html_url"):
+        gh_issue_url = str(cursor_meta.get("html_url") or "")
+    elif github_issue and repo:
+        gh_issue_url = f"https://github.com/wozniaknorbert95-del/{repo}/issues/{github_issue}"
     return {
         "issue": issue_id,
         "title": issue.get("title") or "",
@@ -178,7 +201,8 @@ def enrich_live(
         "input_tokens": None,
         "output_tokens": None,
         "cost": None,
-        "github_issue": pr if not pr_url else None,
+        "github_issue": github_issue or None,
+        "github_issue_url": gh_issue_url or None,
     }
 
 
