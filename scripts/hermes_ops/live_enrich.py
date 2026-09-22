@@ -107,8 +107,13 @@ def enrich_live(
                 "reason": type(exc).__name__,
             }
     else:
-        # Offline / tracking issue only — S2 after @cursor is the honest floor.
-        cursor_ok = bool(cursor_meta and cursor_meta.get("ok")) or bool(lock.get("cursor_triggered"))
+        # Offline / tracking issue only — S2 after a real @cursor comment (2xx).
+        wake_state = str((cursor_meta or {}).get("wake_state") or lock.get("wake_state") or "")
+        commented = bool((cursor_meta or {}).get("commented") is True) or wake_state in (
+            "commented",
+            "already",
+        )
+        cursor_ok = commented and bool(github_issue or (cursor_meta or {}).get("issue_number"))
         evaluated = {
             "step": 2 if issue_id else 0,
             "status": "UNKNOWN" if not issue_id else "PASS",
@@ -116,7 +121,7 @@ def enrich_live(
                 {"step": 1, "status": "PASS" if issue_id else "UNKNOWN", "evidence": [{"kind": "linear_issue", "id": issue_id}], "reason": ""},
                 {
                     "step": 2,
-                    "status": "PASS" if cursor_ok or issue_id else "UNKNOWN",
+                    "status": "PASS" if cursor_ok else "UNKNOWN",
                     "evidence": [{"kind": "cursor_trigger", "github_issue": github_issue or None, "repo": repo}],
                     "reason": "",
                 },
@@ -161,14 +166,20 @@ def enrich_live(
         "model": str(agent.get("model") or ""),
         "run_id": str(agent.get("run_id") or ""),
     }
-    if cursor_meta and cursor_meta.get("ok") and not run_url:
+    comment_url = str(
+        (cursor_meta or {}).get("comment_url") or lock.get("cursor_comment_url") or ""
+    ).strip()
+    if comment_url and not (comment_url.startswith("http://") or comment_url.startswith("https://")):
+        comment_url = ""
+    wake_state = str((cursor_meta or {}).get("wake_state") or lock.get("wake_state") or "")
+    if cursor_meta and cursor_meta.get("ok") and cursor_meta.get("commented") is True and not run_url:
         note = f"@cursor on {repo}#{github_issue or pr}"
         if cursor_meta.get("created"):
             note += " (created)"
-        if cursor_meta.get("html_url"):
+        if comment_url:
+            note += f" {comment_url}"
+        elif cursor_meta.get("html_url"):
             note += f" {cursor_meta.get('html_url')}"
-        elif cursor_meta.get("commented") is False:
-            note += " (body @cursor; comment 403)"
         recent = list(recent) + [
             {
                 "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -176,8 +187,11 @@ def enrich_live(
             }
         ]
     gh_issue_url = ""
-    if cursor_meta and cursor_meta.get("html_url"):
+    if cursor_meta and str(cursor_meta.get("html_url") or "").startswith("https://github.com/"):
         gh_issue_url = str(cursor_meta.get("html_url") or "")
+        if "#issuecomment-" in gh_issue_url and not comment_url:
+            comment_url = gh_issue_url
+            gh_issue_url = gh_issue_url.split("#", 1)[0]
     elif github_issue and repo:
         gh_issue_url = f"https://github.com/wozniaknorbert95-del/{repo}/issues/{github_issue}"
     return {
@@ -203,6 +217,8 @@ def enrich_live(
         "cost": None,
         "github_issue": github_issue or None,
         "github_issue_url": gh_issue_url or None,
+        "cursor_comment_url": comment_url or None,
+        "wake_state": wake_state or None,
     }
 
 

@@ -84,6 +84,10 @@ class Engine:
         if started and (time.time() - started) > TTL_MIN * 60:
             self.engine_state = "PAUSED"
             self._clear_lock()
+            append_event(
+                {"kind": "stale_lock", "result": "cleared", "agent": self.worker},
+                self.ledger,
+            )
             return False
         return True
 
@@ -212,33 +216,34 @@ class Engine:
             return {"ok": False, "code": 429, "error": "daily_cap"}
         issue_id = str(issue.get("id") or "")
         started = time.time()
+        repo = str(issue.get("repo") or "workflow-lab")
+        # Pending lock only — RUNNING is illegal until @cursor comment is 2xx.
         self._write_lock(
             {
                 "issue_id": issue_id,
                 "started": started,
-                "repo": issue.get("repo"),
+                "repo": repo,
                 "pr": issue.get("github_number"),
+                "wake_state": "pending",
             }
         )
-        self.engine_state = "RUNNING"
-        repo = str(issue.get("repo") or "workflow-lab")
         # E4: Linear issues usually lack github_number — create/find GH issue + @cursor.
         trigger = self.github.ensure_cursor_trigger(repo, issue)
-        if not trigger.get("ok"):
-            self.engine_state = "PAUSED"
-            self._clear_lock()
-            self.save_state()
+        commented_ok = bool(trigger.get("ok") and trigger.get("commented") is True)
+        number = int(trigger.get("issue_number") or 0)
+        if not commented_ok or number <= 0:
+            self.pause()
             return {
                 "ok": False,
                 "code": int(trigger.get("code") or 401),
-                "error": str(trigger.get("error") or "cursor_trigger_failed"),
+                "error": str(trigger.get("error") or "cursor_wake_failed"),
             }
-        number = int(trigger.get("issue_number") or issue.get("github_number") or 0)
         # Prefer the repo that actually received @cursor (may fall back to workflow-lab).
         used_repo = str(trigger.get("repo") or repo)
         # Newly created tracking issues are NOT PRs — do not feed them into PR enrich.
         created_issue = bool(trigger.get("created"))
         existing_pr = int(issue.get("github_number") or 0) if not created_issue else 0
+        self.engine_state = "RUNNING"
         # Lock: github_issue = tracking issue; pr = real PR only (0 until agent opens one).
         self._write_lock(
             {
@@ -247,10 +252,19 @@ class Engine:
                 "repo": used_repo,
                 "pr": existing_pr or None,
                 "github_issue": number,
+                "cursor_comment_url": trigger.get("comment_url") or "",
+                "wake_state": str(trigger.get("wake_state") or "commented"),
                 "cursor_triggered": True,
             }
         )
-        commented = {"ok": True, "issue_number": number, "created": trigger.get("created"), "repo": used_repo}
+        commented = {
+            "ok": True,
+            "issue_number": number,
+            "created": trigger.get("created"),
+            "repo": used_repo,
+            "comment_url": trigger.get("comment_url") or "",
+            "wake_state": trigger.get("wake_state"),
+        }
         enrich_issue = {**issue, "repo": used_repo}
         if existing_pr > 0:
             enrich_issue["github_number"] = existing_pr

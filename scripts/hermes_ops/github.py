@@ -19,8 +19,12 @@ OWNER = os.environ.get("GITHUB_OPS_OWNER", "wozniaknorbert95-del")
 class GitHubOps:
     def __init__(self, token: str | None = None, fetch: Callable | None = None) -> None:
         self.token = (token if token is not None else WRITE_TOKEN).strip()
-        self.comment_token = (COMMENT_TOKEN or self.token).strip()
         self.fetch = fetch
+        # Production comments use GITHUB_OPS_COMMENT only. Tests with `fetch=`
+        # reuse the injected token so unit tests stay offline.
+        self.comment_token = COMMENT_TOKEN.strip()
+        if self.fetch and not self.comment_token:
+            self.comment_token = self.token
 
     def _headers(self, token: str | None = None) -> dict[str, str]:
         tok = (token if token is not None else self.token).strip()
@@ -33,13 +37,49 @@ class GitHubOps:
     def comment_cursor(self, repo: str, issue_number: int, body: str = "@cursor") -> dict[str, Any]:
         if repo not in ALLOWED_REPOS:
             return {"ok": False, "code": 403, "error": "repo_not_in_policy"}
+        if not self.fetch and not self.comment_token:
+            return {"ok": False, "code": 401, "error": "missing_GITHUB_OPS_COMMENT"}
         if "@cursor" not in body:
             body = "@cursor\n" + body
-        return self._post(
+        res = self._post(
             f"/repos/{OWNER}/{repo}/issues/{issue_number}/comments",
             {"body": body},
             token=self.comment_token,
         )
+        if res.get("ok"):
+            return res
+        code = int(res.get("code") or 0)
+        if code == 403:
+            return {**res, "error": "cursor_wake_forbidden"}
+        err = str(res.get("error") or "")
+        if err.startswith("missing_"):
+            return res
+        return {**res, "error": "cursor_wake_failed"}
+
+    def find_wake_comment(self, repo: str, issue_number: int) -> dict[str, Any]:
+        """Return existing Hermes @cursor comment (idempotent retry)."""
+        if repo not in ALLOWED_REPOS or issue_number <= 0:
+            return {}
+        res = self._get(
+            f"/repos/{OWNER}/{repo}/issues/{issue_number}/comments?per_page=30",
+            token=self.comment_token or self.token,
+        )
+        if not res.get("ok"):
+            return {}
+        raw = res.get("body")
+        items = raw if isinstance(raw, list) else []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            text = str(item.get("body") or "")
+            if "@cursor" not in text:
+                continue
+            if "Hermes Ops" not in text and "Cloud Agent" not in text:
+                continue
+            url = str(item.get("html_url") or "")
+            if url.startswith("https://"):
+                return {"html_url": url, "id": item.get("id")}
+        return {}
 
     def create_issue(self, repo: str, title: str, body: str, labels: list[str] | None = None) -> dict[str, Any]:
         if repo not in ALLOWED_REPOS:
@@ -111,37 +151,52 @@ class GitHubOps:
             created = True
             if number <= 0:
                 return {"ok": False, "code": 599, "error": "create_issue_no_number"}
+        issue_url = ""
+        if created:
+            issue_url = str(((created_res.get("body") or {}).get("html_url")) or "")
+        if not issue_url:
+            issue_url = f"https://github.com/{OWNER}/{used_repo}/issues/{number}"
+
+        existing = self.find_wake_comment(used_repo, number)
+        if existing.get("html_url"):
+            return {
+                "ok": True,
+                "issue_number": number,
+                "created": created,
+                "commented": True,
+                "wake_state": "already",
+                "repo": used_repo,
+                "html_url": issue_url,
+                "comment_url": existing.get("html_url"),
+            }
+
         comment_body = f"@cursor\n\nLinear `{linear_id}` — Hermes Ops Start/Run next."
         commented = self.comment_cursor(used_repo, number, comment_body)
-        # Write PAT may 403 comments; GITHUB_OPS_COMMENT or cursor-wake.yml posts @cursor.
         if not commented.get("ok"):
-            if created:
-                return {
-                    "ok": True,
-                    "issue_number": number,
-                    "created": True,
-                    "commented": False,
-                    "wake": "actions",
-                    "repo": used_repo,
-                    "comment_error": commented.get("error") or "comment_forbidden",
-                    "html_url": ((created_res.get("body") or {}).get("html_url") if created else ""),
-                    "note": "comment 403 — cursor-wake.yml comments @cursor on issue open",
-                }
+            # Fail-closed: creating the issue is not a wake. Cursor Cloud
+            # starts only on a 2xx @cursor comment. Actions workflow is a
+            # fallback, never a tick success.
             return {
                 "ok": False,
                 "code": commented.get("code") or 599,
-                "error": commented.get("error") or "comment_failed",
+                "error": commented.get("error") or "cursor_wake_failed",
                 "issue_number": number,
                 "created": created,
+                "commented": False,
+                "wake_state": "failed",
                 "repo": used_repo,
+                "html_url": issue_url,
             }
+        comment_url = str(((commented.get("body") or {}).get("html_url")) or "")
         return {
             "ok": True,
             "issue_number": number,
             "created": created,
             "commented": True,
+            "wake_state": "commented",
             "repo": used_repo,
-            "html_url": ((commented.get("body") or {}).get("html_url") or ""),
+            "html_url": issue_url,
+            "comment_url": comment_url,
         }
 
     def merge_pull(self, repo: str, pull_number: int, checks_green: bool, issue: dict | None = None) -> dict[str, Any]:
@@ -155,8 +210,8 @@ class GitHubOps:
         ok, code, reason = allow_deploy("workflow_dispatch")
         return {"ok": ok, "code": code, "error": reason, "exists": has_workflow_dispatch_deploy()}
 
-    def _get(self, path: str) -> dict[str, Any]:
-        return self._request("GET", path, None)
+    def _get(self, path: str, token: str | None = None) -> dict[str, Any]:
+        return self._request("GET", path, None, token=token)
 
     def _post(self, path: str, payload: dict[str, Any], token: str | None = None) -> dict[str, Any]:
         return self._request("POST", path, payload, token=token)
