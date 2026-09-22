@@ -332,6 +332,64 @@ def main() -> int:
                 errors.append("E4 expect create issue when github_number missing")
             if not any("@cursor" in json.dumps(c[2] or {}) for c in comment_calls):
                 errors.append("E4 @cursor comment body missing")
+            live = engine_e4.live or {}
+            if live.get("pr_url") or live.get("pr_number"):
+                errors.append(f"E4 tracking issue must not look like a PR: {live.get('pr_url')} #{live.get('pr_number')}")
+            if int(live.get("github_issue") or 0) != 501:
+                errors.append(f"E4 expect github_issue=501, got {live.get('github_issue')}")
+
+        # E4/E5: dsaas create 403 → fallback workflow-lab; never invent dsaas PR URL.
+        calls_fb: list[tuple] = []
+
+        def fetch_fallback(method, path, payload):
+            calls_fb.append((method, path, payload))
+            if method == "POST" and "/dsaas-platform-main/issues" in path and "/comments" not in path:
+                return {"ok": False, "code": 403, "error": "http_403", "detail": "Resource not accessible"}
+            if method == "POST" and path.rstrip("/").endswith("/issues") and "/comments" not in path:
+                return {
+                    "ok": True,
+                    "code": 201,
+                    "body": {
+                        "number": 77,
+                        "html_url": "https://github.com/wozniaknorbert95-del/workflow-lab/issues/77",
+                    },
+                }
+            if "comments" in path:
+                return {"ok": False, "code": 403, "error": "http_403"}
+            return {"ok": True, "code": 200, "body": {}}
+
+        gh_fb = GitHubOps(token="test", fetch=fetch_fallback)
+        engine_fb = Engine(
+            github=gh_fb,
+            mode="MANUAL",
+            lock_path=tmp_path / "lock-fb.json",
+            ledger=tmp_path / "ledger-fb.jsonl",
+            state_path=tmp_path / "state-fb.json",
+            github_read_token="tok",  # would wrongly fetch PR if we pass issue# as pr
+        )
+        dsaas_bare = {
+            "id": "QUI-89",
+            "title": "discover",
+            "repo": "dsaas-platform-main",
+            "labels": ["agent"],
+            "github_number": 0,
+        }
+        out_fb = engine_fb.run_next(dsaas_bare)
+        if not out_fb.get("ok"):
+            errors.append(f"E4 fallback create expect ok: {out_fb}")
+        else:
+            live_fb = engine_fb.live or {}
+            if live_fb.get("repo") != "workflow-lab":
+                errors.append(f"E4 fallback repo expect workflow-lab, got {live_fb.get('repo')}")
+            if live_fb.get("pr_url") or live_fb.get("pr_number"):
+                errors.append(f"E4 fallback must not invent PR: {live_fb.get('pr_url')}")
+            if int(live_fb.get("github_issue") or 0) != 77:
+                errors.append(f"E4 fallback github_issue: {live_fb.get('github_issue')}")
+            if "dsaas-platform-main/pull" in json.dumps(live_fb):
+                errors.append("E4 fallback must never point at dsaas pull from tracking issue#")
+            lock_fb = json.loads((tmp_path / "lock-fb.json").read_text(encoding="utf-8"))
+            if lock_fb.get("repo") != "workflow-lab" or lock_fb.get("pr"):
+                errors.append(f"E4 fallback lock: {lock_fb}")
 
     if errors:
         print("FAIL:")
