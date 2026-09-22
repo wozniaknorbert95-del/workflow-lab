@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workflow-lab/qui-89/lead-spine",
+  "title": "QUI-89 lead correlation spine (no PII)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["lead_id", "tenant_id", "lifecycle_state", "created_at", "source_channel"],
+  "properties": {
+    "lead_id": {
+      "type": "string",
+      "pattern": "^lead_[0-9A-HJKMNP-TV-Z]{26}$",
+      "description": "Opaque ULID-based id, unique per tenant"
+    },
+    "tenant_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "lifecycle_state": {
+      "type": "string",
+      "enum": [
+        "captured",
+        "qualified",
+        "offer_active",
+        "ordered",
+        "invoiced",
+        "closed_won",
+        "closed_lost"
+      ]
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "source_channel": {
+      "type": "string",
+      "enum": ["inbound", "outbound", "referral", "unknown"]
+    },
+    "measurement_eligible": { "type": "boolean" }
+  }
+}

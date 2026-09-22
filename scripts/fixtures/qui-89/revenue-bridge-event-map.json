@@ -1,0 +1,107 @@
+{
+  "version": "qui-89-discovery-v1",
+  "measurement_policy": {
+    "funnel_stages": ["offer", "order", "invoice"],
+    "before_implementation": "measurement: brak",
+    "revenue_trigger_event": "invoice.paid",
+    "requires_tenant_id_on_every_event": true
+  },
+  "events": [
+    {
+      "type": "lead.captured",
+      "stage": "lead",
+      "required": ["lead_id", "tenant_id", "source_channel", "created_at"],
+      "measurement": "none"
+    },
+    {
+      "type": "lead.qualified",
+      "stage": "lead",
+      "required": ["lead_id", "tenant_id"],
+      "measurement": "none"
+    },
+    {
+      "type": "offer.created",
+      "stage": "offer",
+      "required": ["lead_id", "tenant_id", "offer_id"],
+      "measurement": "none"
+    },
+    {
+      "type": "offer.sent",
+      "stage": "offer",
+      "required": ["lead_id", "tenant_id", "offer_id", "sent_at"],
+      "measurement": "none"
+    },
+    {
+      "type": "offer.accepted",
+      "stage": "offer",
+      "required": ["lead_id", "tenant_id", "offer_id", "accepted_at"],
+      "measurement": "none"
+    },
+    {
+      "type": "offer.declined",
+      "stage": "offer",
+      "required": ["lead_id", "tenant_id", "offer_id", "declined_at"],
+      "measurement": "none"
+    },
+    {
+      "type": "order.created",
+      "stage": "order",
+      "required": ["lead_id", "tenant_id", "order_id", "offer_id"],
+      "measurement": "none"
+    },
+    {
+      "type": "order.confirmed",
+      "stage": "order",
+      "required": ["lead_id", "tenant_id", "order_id", "confirmed_at"],
+      "measurement": "none"
+    },
+    {
+      "type": "order.cancelled",
+      "stage": "order",
+      "required": ["lead_id", "tenant_id", "order_id", "cancelled_at"],
+      "measurement": "none"
+    },
+    {
+      "type": "invoice.issued",
+      "stage": "invoice",
+      "required": [
+        "lead_id",
+        "tenant_id",
+        "invoice_id",
+        "order_id",
+        "amount_net",
+        "currency",
+        "issued_at"
+      ],
+      "measurement": "pipeline_optional"
+    },
+    {
+      "type": "invoice.paid",
+      "stage": "invoice",
+      "required": [
+        "lead_id",
+        "tenant_id",
+        "invoice_id",
+        "order_id",
+        "amount_net",
+        "currency",
+        "paid_at"
+      ],
+      "measurement": "revenue"
+    },
+    {
+      "type": "invoice.voided",
+      "stage": "invoice",
+      "required": ["lead_id", "tenant_id", "invoice_id", "voided_at"],
+      "measurement": "revenue_excluded"
+    }
+  ],
+  "tenant_isolation_tests": [
+    { "id": "TI-01", "scenario": "read_lead_in_tenant_context", "expect": "no_cross_tenant_rows" },
+    { "id": "TI-02", "scenario": "write_offer_with_foreign_lead_id", "expect": "fail_closed" },
+    { "id": "TI-03", "scenario": "aggregate_revenue_without_tenant_filter", "expect": "fail_closed" },
+    { "id": "TI-04", "scenario": "ingest_pii_field", "expect": "fail_closed" },
+    { "id": "TI-05", "scenario": "replay_event_tenant_mismatch", "expect": "fail_closed" },
+    { "id": "TI-06", "scenario": "dashboard_counter_isolation", "expect": "tenant_a_unchanged_by_b" }
+  ]
+}
