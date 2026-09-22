@@ -1,51 +1,46 @@
-# QUI-88 — ROLE-AUDIT-13: Zespół — wniosek zatrudnienia na team-desk + 5 kroków z business-rules
+# QUI-88 — ROLE-AUDIT-13: wniosek zatrudnienia na `team-desk` (5 kroków SSoT)
 
 Date: 2026-09-22  
 Linear: [QUI-88](https://linear.app/quietforge/issue/QUI-88/role-audit-13-p2-zespol-wniosek-zatrudnienia-na-team-desk-5-krokow-z)  
+Parent: [QUI-75](https://linear.app/quietforge/issue/QUI-75/role-audit-qf-rolejob-audit-domkniecie-luk-pracownikow-i-dzialow)  
+Depends on owner resolution: [QUI-79](https://linear.app/quietforge/issue/QUI-79/role-audit-04-p1-zespol-konflikt-leadid-owner-vs-hr-stewardb7) (Done)  
 Target repo: `dsaas-platform-main`  
-GitHub tracking: [workflow-lab#86](https://github.com/wozniaknorbert95-del/workflow-lab/issues/86)  
-Scope: **Discovery / Specification in workflow-lab** — zero platform code modification, zero PII, zero deploy.
+GitHub tracking: [workflow-lab#86](https://github.com/wozniaknorbert95-del/workflow-lab/issues/86)
+
+Scope: **lab contract mirror** — discovery fixtures + producer/tests in `workflow-lab`; port to platform runtime/Taca in a follow-up MR on `dsaas-platform-main`. Zero PII, zero deploy.
 
 ---
 
 ## 1. Kontekst i granice (Lab vs Platforma)
 
 Zgodnie z regułami żelaznymi (`AGENTS.md` §1 oraz `docs/ops/PLATFORM-HITL-BRIDGE.md`):
+
 - `workflow-lab` jest środowiskiem testowym pętli dostarczania; nie zawiera kodu `dsaas-platform-main`.
 - Cloud Agent w labie **nie dotyka** repozytorium platformy, nie wykonuje wdrożeń (`deploy = out of scope forever`).
-- Zadanie [QUI-88] dotyczy procesu kadrowo-organizacyjnego na platformie: wniosku o zatrudnienie na `team-desk` z zachowaniem 5 kroków deterministycznych zdefiniowanych w `tenancy/tenants/quietforge/business-rules.json`.
-- Artefakt w labie dostarcza specyfikację kontraktu (Discovery / Architecture proposal) oraz machine-readable fixtures (schemat wniosku i sekwencja kroków), które po zielonym CI i akceptacji Dowódcy (R7) stanowią podstawę implementacji w osobnym issue/PR na platformie.
+- Artefakt w labie dostarcza specyfikację kontraktu oraz machine-readable fixtures, które po zielonym CI i akceptacji Dowódcy (R7) stanowią podstawę implementacji na platformie.
 
 ---
 
-## 2. 5 kroków wniosku zatrudnienia (`business-rules`)
+## 2. E0 — delta 5 kroków SSoT vs płyta
 
-Proces zatrudnienia (wniosek na `team-desk`) opiera się na 5-stopniowym automacie stanów:
+| Źródło | Kroki | Uwagi |
+| --- | ---: | --- |
+| SSoT `business-rules.processes.zespol.zatrudnienie` | **5** | `need_submitted` → `role_defined` → `hr_review` → `owner_acceptance` → `onboarding_gate` |
+| `base-plate.json` (krótszy wariant) | **3** | `request` → `owner_acceptance` → `done` — brak `hr_review` i jawnej bramki „no spawn agent” |
+
+Fixture SSoT (producer): `scripts/fixtures/qui-88/zespol-zatrudnienie-ssot-5steps.json`  
+Fixture płyta: `scripts/fixtures/qui-88/zespol-zatrudnienie-base-plate-short.json`  
+Fixture kontraktu kroków (discovery): `scripts/fixtures/qui-88/business-rules-steps.json`
+
+### Mapowanie koncepcyjne (platforma / business-rules)
 
 ```mermaid
 flowchart TD
-    S1[1. draft_submission: Zgłoszenie zapotrzebowania] --> S2[2. role_budget_verification: Weryfikacja budżetu i etatu]
-    S2 --> S3[3. compliance_check: Sprawdzenie uprawnień i ról R1-R7]
-    S3 --> S4[4. dowodca_approval: Decyzja Dowódcy / Human-Stop]
-    S4 --> S5[5. seat_allocation: Przydział miejsca na team-desk i onboarding]
+    S1[1. draft_submission] --> S2[2. role_budget_verification]
+    S2 --> S3[3. compliance_check]
+    S3 --> S4[4. dowodca_approval HITL]
+    S4 --> S5[5. seat_allocation]
 ```
-
-### Opis kroków:
-1. **`draft_submission` (Złożenie wniosku)**:
-   - Wnioskodawca (lider zespołu / działu) zgłasza zapotrzebowanie na nowe stanowisko na `team-desk`.
-   - Wymagane pola: `request_id`, `tenant_id`, `target_team`, `role_title`, `requested_headcount`.
-   - Zasada bezwzględna: zero PII kandydata na tym etapie (kandydat jeszcze nieznany lub dane personalne poza schematem technicznym).
-2. **`role_budget_verification` (Weryfikacja budżetowa)**:
-   - Sprawdzenie limitu etatów oraz progów kosztowych w `business-rules.json` danego tenanta.
-   - Weryfikacja, czy dział posiada wolny alokowany budżet i slot na team-desk.
-3. **`compliance_check` (Zgodność z architekturą ról)**:
-   - Przyporządkowanie stanowiska do matrycy uprawnień i ontologii platformy (np. R1–R7).
-   - Blokada nieautoryzowanych uprawnień administracyjnych (fail-closed).
-4. **`dowodca_approval` (Bramka Dowódcy — HITL)**:
-   - Zgodnie z `PLATFORM-HITL-BRIDGE.md`: zatwierdzenie wniosku kadrowego wymaga jednoznacznej zgody człowieka (Dowódca / R7).
-   - Automat nie może samowolnie przejść do onboardingu bez podpisu/decyzji `GO`.
-5. **`seat_allocation` (Alokacja stanowiska na team-desk)**:
-   - Po zatwierdzeniu przez Dowódcę następuje alokacja identyfikatora stanowiska (`seat_id`) w systemie team-desk oraz przejście wniosku do stanu `approved_allocated`.
 
 ---
 
@@ -53,30 +48,69 @@ flowchart TD
 
 - Identyfikator: `req_<ulid>` unikalny w obrębie `tenant_id`.
 - Tenant isolation: pole `tenant_id` jest obowiązkowe we wszystkich zapytaniach i zdarzeniach.
-- Zakaz PII: schemat zabrania pól takich jak `pesel`, `nip`, `salary_amount`, `candidate_name`, `phone`, `email`. Kwoty i finanse odwołują się wyłącznie do predefiniowanych pasm płacowych w regułach biznesowych.
+- Zakaz PII: schemat zabrania pól takich jak `pesel`, `nip`, `salary_amount`, `candidate_name`, `phone`, `email`.
 
 ---
 
-## 4. Plan testów izolacji i bramkowania (Platform test plan)
+## 4. Właściciel wniosku (ROLE-AUDIT-04 / QUI-79)
 
-Dla implementacji w `dsaas-platform-main`:
+| Rola | Id | Zastosowanie |
+| --- | --- | --- |
+| Szef wykonawczy Zespołu | `hr-steward` | Producer karty, kroki operacyjne |
+| Human-stop akceptacji | `owner` | Akceptacja zatrudnienia na Tacy — **nie** worker id w katalogu |
+
+---
+
+## 5. Producer karty `team-desk` (E1)
+
+Moduł: `scripts/team_desk/employment.py`
+
+Pola wniosku (AC #1): `department`, `position`, `duties_kpi`, `technology`.
+
+Karta Taca (AC #2): `desk=team-desk`, `status=pending`, `labels` zawiera `hitl:approval-required`, `approval_owner=owner`, `producer=hr-steward`.
+
+---
+
+## 6. Approve ≠ spawn agenta (AC #3, E2)
+
+`approve_employment_card()` ustawia `status=approved`, `executed=false`, `decision=employment_accepted_no_runtime_spawn`.  
+Test utrzymuje stałą listę agentów runtime (`≤3`) — brak append/spawn.
+
+---
+
+## 7. Plan testów izolacji (platforma)
 
 | Test ID | Scenariusz | Oczekiwany wynik |
 |---------|------------|------------------|
-| HR-01 | Złożenie wniosku bez `tenant_id` | **FAIL closed** (walidacja schematu) |
-| HR-02 | Próba odczytu wniosku tenant A przez sesję tenant B | **FAIL closed** (404/403, 0 rekordów) |
-| HR-03 | Przejście do kroku 5 (`seat_allocation`) z pominięciem kroku 4 (`dowodca_approval`) | **FAIL closed** (nielegalna tranzycja stanu) |
-| HR-04 | Próba załączenia pól PII (`candidate_name`, `email`) | **FAIL closed** (odrzucenie payloadu) |
-| HR-05 | Złożenie wniosku przekraczającego limit w `business-rules.json` | Odrzucenie na etapie `role_budget_verification` |
+| HR-01 | Złożenie wniosku bez `tenant_id` | **FAIL closed** |
+| HR-02 | Odczyt wniosku tenant A przez sesję tenant B | **FAIL closed** |
+| HR-03 | Przejście do kroku 5 z pominięciem HITL | **FAIL closed** |
+| HR-04 | Payload z PII (`candidate_name`, `email`) | **FAIL closed** |
+| HR-05 | Wniosek ponad limit w `business-rules.json` | Odrzucenie na weryfikacji budżetu |
 
 ---
 
-## 5. Podsumowanie i dalsze kroki
+## 8. Weryfikacja (lab)
 
-1. **Workflow Lab**:
-   - Utworzono specyfikację w `docs/evidence/qui-88-role-audit-13-team-desk.md`.
-   - Zarejestrowano schemat w `scripts/fixtures/qui-88/hiring-request-schema.json`.
-   - Zarejestrowano definicję 5 kroków w `scripts/fixtures/qui-88/business-rules-steps.json`.
-   - Dodano testy spójności w `scripts/test_hermes_ops.py`.
-2. **Platforma (`dsaas-platform-main`)**:
-   - Wdrożenie kodu store/API dla `team-desk` nastąpi w osobnym issue na platformie po weryfikacji i akceptacji niniejszego discovery przez Dowódcę (R7).
+```bash
+python scripts/test_team_desk.py
+python scripts/test_hermes_ops.py
+npm run lint && npm test && npm run build
+```
+
+---
+
+## 9. Dziennik wykonania (Hermes Ops)
+
+| Etap | Status | Dowód |
+| --- | --- | --- |
+| E0 delta SSoT vs płyta | Done | fixtures `zespol-zatrudnienie-*`, `test_team_desk.py` |
+| E1 producer `team-desk` | Done | `scripts/team_desk/employment.py` |
+| E2 no-spawn + EV | Done | `approve_employment_card`, CI `phone-loop-guard` |
+| Discovery kontraktu | Done | `business-rules-steps.json`, `hiring-request-schema.json` |
+
+---
+
+## 10. Następny krok (platforma)
+
+Przenieść producer do `runtime/` + test pytest `team-desk` na `dsaas-platform-main` z tym samym kontraktem fixture; merge na platformie po GO / dostępie repo.

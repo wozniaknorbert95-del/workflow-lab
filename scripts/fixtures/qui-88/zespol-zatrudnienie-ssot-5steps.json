@@ -1,0 +1,43 @@
+{
+  "process_id": "zespol.zatrudnienie",
+  "tenant_id": "quietforge",
+  "source": "tenancy/tenants/quietforge/business-rules.json (contract mirror — lab)",
+  "steps": [
+    {
+      "id": "need_submitted",
+      "order": 1,
+      "title": "Department submits hiring need",
+      "requires_approval": false,
+      "owner_worker": "hr-steward"
+    },
+    {
+      "id": "role_defined",
+      "order": 2,
+      "title": "Role package: department, position, duties+KPI, technology",
+      "requires_approval": false,
+      "owner_worker": "hr-steward"
+    },
+    {
+      "id": "hr_review",
+      "order": 3,
+      "title": "B7 CHRO / hr-steward validates headcount and role fit",
+      "requires_approval": false,
+      "owner_worker": "hr-steward"
+    },
+    {
+      "id": "owner_acceptance",
+      "order": 4,
+      "title": "Commander human-stop accepts employment (not a catalog worker id)",
+      "requires_approval": true,
+      "owner_human_stop": "owner"
+    },
+    {
+      "id": "onboarding_gate",
+      "order": 5,
+      "title": "Onboarding recorded — no runtime agent spawn (≤3 agents)",
+      "requires_approval": false,
+      "owner_worker": "hr-steward",
+      "forbidden_effects": ["spawn_runtime_agent", "workers_catalog_append_without_4_1"]
+    }
+  ]
+}

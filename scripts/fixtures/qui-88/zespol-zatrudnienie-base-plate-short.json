@@ -1,0 +1,25 @@
+{
+  "process_id": "zespol.zatrudnienie",
+  "source": "tenancy/base-plate.json (shorter variant — contract mirror — lab)",
+  "steps": [
+    {
+      "id": "request",
+      "order": 1,
+      "title": "Employment request drafted",
+      "requires_approval": false
+    },
+    {
+      "id": "owner_acceptance",
+      "order": 2,
+      "title": "Owner accepts",
+      "requires_approval": true,
+      "owner_human_stop": "owner"
+    },
+    {
+      "id": "done",
+      "order": 3,
+      "title": "Marked hired",
+      "requires_approval": false
+    }
+  ]
+}
