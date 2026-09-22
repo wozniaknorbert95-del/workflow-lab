@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workflow-lab/qui-88/hiring-request",
+  "title": "QUI-88 Hiring Request on Team-Desk (no PII)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "request_id",
+    "tenant_id",
+    "target_team",
+    "role_title",
+    "requested_headcount",
+    "current_step",
+    "status",
+    "created_at"
+  ],
+  "properties": {
+    "request_id": {
+      "type": "string",
+      "pattern": "^req_[0-9A-HJKMNP-TV-Z]{26}$",
+      "description": "Opaque ULID-based request identifier"
+    },
+    "tenant_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_team": {
+      "type": "string",
+      "minLength": 1
+    },
+    "role_title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "requested_headcount": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10
+    },
+    "current_step": {
+      "type": "string",
+      "enum": [
+        "draft_submission",
+        "role_budget_verification",
+        "compliance_check",
+        "dowodca_approval",
+        "seat_allocation"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "in_review",
+        "approved",
+        "rejected",
+        "allocated"
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "seat_id": {
+      "type": "string",
+      "pattern": "^seat_[0-9A-HJKMNP-TV-Z]{26}$"
+    }
+  }
+}

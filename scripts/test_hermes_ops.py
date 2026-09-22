@@ -51,6 +51,24 @@ def main() -> int:
             if f'"{banned}"' in spine_raw:
                 errors.append(f"qui-89: spine schema must not define PII field {banned}")
 
+    qui88_steps = ROOT / "scripts" / "fixtures" / "qui-88" / "business-rules-steps.json"
+    qui88_schema = ROOT / "scripts" / "fixtures" / "qui-88" / "hiring-request-schema.json"
+    if qui88_steps.is_file():
+        steps_data = json.loads(qui88_steps.read_text(encoding="utf-8"))
+        steps = steps_data.get("steps") or []
+        if len(steps) != 5:
+            errors.append("qui-88: business-rules-steps must define exactly 5 steps")
+        hitl_step = next((s for s in steps if s.get("id") == "dowodca_approval"), None)
+        if not hitl_step or not hitl_step.get("requires_hitl"):
+            errors.append("qui-88: dowodca_approval step must require HITL")
+        if len(steps_data.get("verification_tests") or []) < 5:
+            errors.append("qui-88: verification tests plan needs HR-01..HR-05")
+    if qui88_schema.is_file():
+        schema_raw = qui88_schema.read_text(encoding="utf-8").lower()
+        for banned in ("candidate_name", "pesel", "salary_amount", "email", "phone"):
+            if f'"{banned}"' in schema_raw:
+                errors.append(f"qui-88: hiring request schema must not define PII/private field {banned}")
+
     fixture = ROOT / "scripts" / "fixtures" / "hermes-ops" / "labels_three.json"
     issues = load_fixture(fixture)
     load_phone_fixture = _load_phone_loop().load_fixture
