@@ -64,6 +64,7 @@ def enrich_live(
     token: str = "",
     fixture: dict[str, Any] | None = None,
     started: float | None = None,
+    cursor_meta: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     """Build Live panel payload. fixture= for tests; else optional GitHub read."""
     if not issue and not lock:
@@ -89,6 +90,9 @@ def enrich_live(
                 or True,
             }
             evaluated = _load_phone_loop().evaluate_from_fixture(payload)
+            # Carry proof fields from GitHub read (E5).
+            evaluated["_github"] = payload.get("github") or {}
+            evaluated["_checks_raw"] = payload.get("checks") or {}
         except Exception as exc:
             evaluated = {
                 "step": 2,
@@ -116,11 +120,43 @@ def enrich_live(
     steps = list(evaluated.get("steps") or [])
     progress = progress_from_steps(steps)
     checks = checks_summary(steps)
-    pr_url = ""
-    for s in steps:
-        for ev in s.get("evidence") or []:
-            if isinstance(ev, dict) and ev.get("kind") == "pr" and ev.get("url"):
-                pr_url = str(ev["url"])
+    gh = evaluated.get("_github") if isinstance(evaluated.get("_github"), dict) else {}
+    pr_url = str(gh.get("pr_url") or "")
+    ci_url = str(gh.get("ci_url") or "")
+    agent = gh.get("agent") if isinstance(gh.get("agent"), dict) else {}
+    diff = gh.get("diff") if isinstance(gh.get("diff"), dict) else None
+    recent = gh.get("recent") if isinstance(gh.get("recent"), list) else []
+    # Only treat github_number as PR when PR URL exists (else it's the tracking issue).
+    # Fixtures keep legacy pr_number for unit tests.
+    if fixture is not None:
+        pr_number = pr or None
+        for s in steps:
+            for ev in s.get("evidence") or []:
+                if isinstance(ev, dict) and ev.get("kind") == "pr" and ev.get("url") and not pr_url:
+                    pr_url = str(ev["url"])
+    else:
+        for s in steps:
+            for ev in s.get("evidence") or []:
+                if isinstance(ev, dict) and ev.get("kind") == "pr" and ev.get("url") and not pr_url:
+                    pr_url = str(ev["url"])
+        pr_number = pr if pr_url else None
+    # Fail-closed agent: only real https run_url (never invent).
+    run_url = str(agent.get("run_url") or "").strip()
+    if run_url and not (run_url.startswith("http://") or run_url.startswith("https://")):
+        run_url = ""
+    agent_out = {
+        "provider": str(agent.get("provider") or ("cursor-cloud" if run_url else "")),
+        "run_url": run_url,
+        "model": str(agent.get("model") or ""),
+        "run_id": str(agent.get("run_id") or ""),
+    }
+    if cursor_meta and cursor_meta.get("ok") and not run_url:
+        recent = list(recent) + [
+            {
+                "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                "text": f"@cursor on #{pr}" + (" (created)" if cursor_meta.get("created") else ""),
+            }
+        ]
     return {
         "issue": issue_id,
         "title": issue.get("title") or "",
@@ -132,12 +168,17 @@ def enrich_live(
         "steps": steps,
         "progress": progress,
         "checks": checks,
-        "pr_number": pr or None,
+        "pr_number": pr_number,
         "pr_url": pr_url or None,
+        "ci_url": ci_url or None,
+        "agent": agent_out,
+        "diff": diff,
+        "recent": recent or None,
         "duration_sec": duration,
         "input_tokens": None,
         "output_tokens": None,
         "cost": None,
+        "github_issue": pr if not pr_url else None,
     }
 
 

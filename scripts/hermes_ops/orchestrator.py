@@ -218,17 +218,38 @@ class Engine:
         )
         self.engine_state = "RUNNING"
         repo = str(issue.get("repo") or "workflow-lab")
-        number = int(issue.get("github_number") or 0)
-        commented = {"ok": True, "skipped": True}
-        if number:
-            commented = self.github.comment_cursor(repo, number)
+        # E4: Linear issues usually lack github_number — create/find GH issue + @cursor.
+        trigger = self.github.ensure_cursor_trigger(repo, issue)
+        if not trigger.get("ok"):
+            self.engine_state = "PAUSED"
+            self._clear_lock()
+            self.save_state()
+            return {
+                "ok": False,
+                "code": int(trigger.get("code") or 401),
+                "error": str(trigger.get("error") or "cursor_trigger_failed"),
+            }
+        number = int(trigger.get("issue_number") or issue.get("github_number") or 0)
+        # Lock stores GitHub issue number for later enrichment (PR may appear later).
+        self._write_lock(
+            {
+                "issue_id": issue_id,
+                "started": started,
+                "repo": repo,
+                "pr": number,
+                "github_issue": number,
+                "cursor_triggered": True,
+            }
+        )
+        commented = {"ok": True, "issue_number": number, "created": trigger.get("created")}
         self.live = enrich_live(
-            issue=issue,
+            issue={**issue, "github_number": number},
             lock=self._lock(),
             worker=self.worker,
             token=self.github_read_token,
             fixture=fixture,
             started=started,
+            cursor_meta=trigger,
         )
         append_event(
             {
@@ -249,7 +270,7 @@ class Engine:
             self.ledger,
         )
         self.save_state()
-        return {"ok": True, "queued": issue_id, "github": commented}
+        return {"ok": True, "queued": issue_id, "github": commented, "cursor": trigger}
 
     def run_all(self, issues: list[dict[str, Any]]) -> dict[str, Any]:
         ok, code, reason = policy.allow_run_all(run_all_enabled())
@@ -384,7 +405,7 @@ def consume_cmd(path: Path | None = None) -> dict[str, Any] | None:
     if not target.is_file():
         return None
     try:
-        data = json.loads(target.read_text(encoding="utf-8"))
+        data = json.loads(target.read_text(encoding="utf-8-sig"))
     except Exception:
         return None
     target.unlink(missing_ok=True)

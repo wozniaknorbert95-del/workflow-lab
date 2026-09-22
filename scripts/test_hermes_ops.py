@@ -68,9 +68,17 @@ def main() -> int:
 
     def fake_fetch(method, path, payload):
         calls.append((method, path, payload))
+        if method == "GET" and "search/issues" in path:
+            return {"ok": True, "code": 200, "body": {"items": []}}
+        if method == "POST" and path.rstrip("/").endswith("/issues") and "/comments" not in path:
+            return {
+                "ok": True,
+                "code": 201,
+                "body": {"number": 501, "html_url": "https://github.com/wozniaknorbert95-del/workflow-lab/issues/501"},
+            }
         if "merge" in path:
             return {"ok": True, "code": 200, "body": {"merged": True}}
-        return {"ok": True, "code": 201, "body": {"id": 1}}
+        return {"ok": True, "code": 201, "body": {"id": 1, "html_url": "https://github.com/x/y/issues/1"}}
 
     gh = GitHubOps(token="test", fetch=fake_fetch)
     with tempfile.TemporaryDirectory() as tmp:
@@ -292,12 +300,45 @@ def main() -> int:
             if str((live_wait.get("checks") or {}).get("overall") or "").upper() == "PASS":
                 errors.append(f"approval ci_green_waiting missing: {cards2} live={live_wait.get('status')}")
 
+        # QUI-70: ack/refuse + ensure_cursor when github_number missing
+        from hermes_ops.dispatch_ack import make_ack, write_refuse, refuse_reason_from_result
+
+        ack = make_ack({"id": "abc123", "action": "start"})
+        if not ack or ack.get("cmd_id") != "abc123":
+            errors.append(f"make_ack: {ack}")
+        refuse_path = tmp_path / "refuse-abc123.json"
+        blob = write_refuse({"id": "abc123", "action": "start"}, "missing_GITHUB_OPS_WRITE", directory=tmp_path)
+        if blob.get("reason") != "missing_GITHUB_OPS_WRITE" or not refuse_path.is_file():
+            errors.append(f"write_refuse: {blob} exists={refuse_path.is_file()}")
+        if refuse_reason_from_result({"ok": False, "code": 429, "error": "daily_cap"}) != "cap_OPS_MAX_RUNS_PER_DAY":
+            errors.append("refuse_reason daily_cap mapping")
+
+        bare = {"id": "QUI-ZZ", "title": "no gh yet", "repo": "workflow-lab", "labels": ["agent"]}
+        engine_e4 = Engine(
+            github=gh,
+            mode="MANUAL",
+            lock_path=tmp_path / "lock-e4.json",
+            ledger=tmp_path / "ledger-e4.jsonl",
+            state_path=tmp_path / "state-e4.json",
+            github_read_token="",
+        )
+        trig = engine_e4.run_next(bare, fixture=phone)
+        if not trig.get("ok"):
+            errors.append(f"E4 ensure_cursor without github_number: {trig}")
+        else:
+            created_calls = [c for c in calls if c[0] == "POST" and str(c[1]).rstrip("/").endswith("/issues")]
+            comment_calls = [c for c in calls if "comments" in str(c[1])]
+            if not created_calls:
+                errors.append("E4 expect create issue when github_number missing")
+            if not any("@cursor" in json.dumps(c[2] or {}) for c in comment_calls):
+                errors.append("E4 @cursor comment body missing")
+
     if errors:
         print("FAIL:")
         for item in errors:
             print(" -", item)
         return 1
-    print("PASS: hermes_ops (Linear router, merge both, live S1-S6, take_over, deny deploy)")
+    print("PASS: hermes_ops (Linear router, merge both, live S1-S6, take_over, deny deploy, QUI-70 ack)")
     return 0
 
 
