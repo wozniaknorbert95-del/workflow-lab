@@ -80,7 +80,9 @@ def today_stats(path: Path | None = None, day: str | None = None) -> dict[str, A
         if not at.startswith(day):
             continue
         kind = str(row.get("kind") or row.get("result") or "")
-        runs += 1
+        # Cap counts agent starts only — pause/mode/ack must not burn OPS_MAX_RUNS_PER_DAY.
+        if kind in ("run_next", "started"):
+            runs += 1
         if kind in ("merged", "merge_ok"):
             merged += 1
         elif kind in ("failed", "fail", "error"):

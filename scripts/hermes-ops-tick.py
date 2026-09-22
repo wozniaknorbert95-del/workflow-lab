@@ -115,6 +115,8 @@ def main() -> int:
         reason = str(last_result.get("error") or "run_all")
         if not last_result.get("ok"):
             _refuse_from(last_result)
+            engine.engine_state = "PAUSED"
+            engine.save_state()
     elif cmd and cmd.get("action") in ("run_next", "retry", "start"):
         wanted = str(cmd.get("issue_id") or "")
         if cmd.get("action") == "retry" and not wanted:
@@ -129,11 +131,14 @@ def main() -> int:
                 reason = str(last_result.get("error") or "run_next")
                 if not last_result.get("ok"):
                     _refuse_from(last_result)
-                    if last_result.get("code") in (403, 409, 429, 401):
-                        engine.engine_state = engine.engine_state or "PAUSED"
+                    engine.engine_state = "PAUSED"
+                    engine._clear_lock()
+                    engine.save_state()
         else:
             reason = "empty_manual_queue"
             _refuse_from({"ok": False, "error": "empty_queue"}, "empty_queue")
+            engine.engine_state = "PAUSED"
+            engine.save_state()
     elif engine.mode in ("AUTOPILOT", "SUPERVISED") and engine.engine_state == "RUNNING" and not ops.last_error:
         engine.tick(issues)
         engine.save_state()
