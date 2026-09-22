@@ -75,12 +75,34 @@ def build_live_payload(
             github["cursor_comment"] = any(
                 "@cursor" in (c.get("body") or "").lower() for c in comments
             )
+            # E5: scrape real agent run URL from comments (fail-closed — never invent).
+            agent = {"provider": "", "run_url": "", "model": "", "run_id": ""}
+            recent = []
+            for c in comments[-15:]:
+                body = c.get("body") or ""
+                recent.append(
+                    {
+                        "at": c.get("created_at") or "",
+                        "text": (body[:120] + ("…" if len(body) > 120 else "")),
+                    }
+                )
+                for token_url in body.replace(")", " ").replace("(", " ").split():
+                    low = token_url.lower()
+                    if "cursor.com" in low and ("/agents" in low or "/agent" in low):
+                        if low.startswith("http"):
+                            agent["run_url"] = token_url.strip(".,;")
+                            agent["provider"] = "cursor-cloud"
+                            if "/agents/" in low:
+                                agent["run_id"] = token_url.rstrip("/").split("/")[-1][:80]
+            github["agent"] = agent
+            github["recent"] = recent[-8:]
             sha = (pr.get("head") or {}).get("sha") or ""
             if sha:
                 cr = api_get(
                     f"/repos/{owner}/{name}/commits/{sha}/check-runs?per_page=100", token
                 )
-                names = {r.get("name"): r.get("conclusion") for r in cr.get("check_runs") or []}
+                runs = cr.get("check_runs") or []
+                names = {r.get("name"): r.get("conclusion") for r in runs}
                 checks["validate"] = names.get("validate") or "skipped"
                 checks["execute"] = (
                     names.get("execute")
@@ -89,8 +111,29 @@ def build_live_payload(
                 )
                 checks["jobs_ran_steps"] = any(
                     r.get("conclusion") == "success" and r.get("name")
-                    for r in cr.get("check_runs") or []
+                    for r in runs
                 )
+                for r in runs:
+                    html = r.get("html_url") or ""
+                    if html and r.get("name") == "validate":
+                        github["ci_url"] = html
+                        break
+                if not github.get("ci_url"):
+                    for r in runs:
+                        if r.get("html_url"):
+                            github["ci_url"] = r.get("html_url")
+                            break
+            try:
+                files = api_get(f"/repos/{owner}/{name}/pulls/{pr['number']}/files?per_page=100", token)
+                if isinstance(files, list):
+                    github["diff"] = {
+                        "files": len(files),
+                        "summary": ", ".join(
+                            (f.get("filename") or "")[:40] for f in files[:5]
+                        ),
+                    }
+            except Exception:
+                pass
             review["approved"] = bool(pr.get("merged") or pr.get("merge_commit_sha"))
             merge["squash_on_main"] = bool(pr.get("merged"))
             merge["sha"] = (pr.get("merge_commit_sha") or "")[:40]
