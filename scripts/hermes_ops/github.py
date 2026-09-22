@@ -11,18 +11,22 @@ from .policy import ALLOWED_REPOS, allow_deploy, allow_merge, has_workflow_dispa
 
 GITHUB_API = os.environ.get("GITHUB_API", "https://api.github.com")
 WRITE_TOKEN = os.environ.get("GITHUB_OPS_WRITE", "")
+# Comments wake Cursor Cloud. Fine-grained GITHUB_OPS_WRITE often 403s on comments.
+COMMENT_TOKEN = os.environ.get("GITHUB_OPS_COMMENT", "").strip()
 OWNER = os.environ.get("GITHUB_OPS_OWNER", "wozniaknorbert95-del")
 
 
 class GitHubOps:
     def __init__(self, token: str | None = None, fetch: Callable | None = None) -> None:
         self.token = (token if token is not None else WRITE_TOKEN).strip()
+        self.comment_token = (COMMENT_TOKEN or self.token).strip()
         self.fetch = fetch
 
-    def _headers(self) -> dict[str, str]:
+    def _headers(self, token: str | None = None) -> dict[str, str]:
+        tok = (token if token is not None else self.token).strip()
         return {
             "Accept": "application/vnd.github+json",
-            "Authorization": f"Bearer {self.token}",
+            "Authorization": f"Bearer {tok}",
             "X-GitHub-Api-Version": "2022-11-28",
         }
 
@@ -31,7 +35,11 @@ class GitHubOps:
             return {"ok": False, "code": 403, "error": "repo_not_in_policy"}
         if "@cursor" not in body:
             body = "@cursor\n" + body
-        return self._post(f"/repos/{OWNER}/{repo}/issues/{issue_number}/comments", {"body": body})
+        return self._post(
+            f"/repos/{OWNER}/{repo}/issues/{issue_number}/comments",
+            {"body": body},
+            token=self.comment_token,
+        )
 
     def create_issue(self, repo: str, title: str, body: str, labels: list[str] | None = None) -> dict[str, Any]:
         if repo not in ALLOWED_REPOS:
@@ -105,8 +113,7 @@ class GitHubOps:
                 return {"ok": False, "code": 599, "error": "create_issue_no_number"}
         comment_body = f"@cursor\n\nLinear `{linear_id}` — Hermes Ops Start/Run next."
         commented = self.comment_cursor(used_repo, number, comment_body)
-        # Some fine-grained PATs can create issues but not comments (403).
-        # Issue body already contains @cursor — treat create as trigger success.
+        # Write PAT may 403 comments; GITHUB_OPS_COMMENT or cursor-wake.yml posts @cursor.
         if not commented.get("ok"):
             if created:
                 return {
@@ -114,10 +121,11 @@ class GitHubOps:
                     "issue_number": number,
                     "created": True,
                     "commented": False,
+                    "wake": "actions",
                     "repo": used_repo,
                     "comment_error": commented.get("error") or "comment_forbidden",
                     "html_url": ((created_res.get("body") or {}).get("html_url") if created else ""),
-                    "note": "GITHUB_OPS_WRITE cannot comment; @cursor embedded in issue body",
+                    "note": "comment 403 — cursor-wake.yml comments @cursor on issue open",
                 }
             return {
                 "ok": False,
@@ -150,19 +158,26 @@ class GitHubOps:
     def _get(self, path: str) -> dict[str, Any]:
         return self._request("GET", path, None)
 
-    def _post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
-        return self._request("POST", path, payload)
+    def _post(self, path: str, payload: dict[str, Any], token: str | None = None) -> dict[str, Any]:
+        return self._request("POST", path, payload, token=token)
 
     def _put(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
         return self._request("PUT", path, payload)
 
-    def _request(self, method: str, path: str, payload: dict[str, Any] | None) -> dict[str, Any]:
+    def _request(
+        self,
+        method: str,
+        path: str,
+        payload: dict[str, Any] | None,
+        token: str | None = None,
+    ) -> dict[str, Any]:
         if self.fetch:
             return self.fetch(method, path, payload or {})
-        if not self.token:
+        use = (token if token is not None else self.token).strip()
+        if not use:
             return {"ok": False, "code": 401, "error": "missing GITHUB_OPS_WRITE"}
         data = None if payload is None else json.dumps(payload).encode("utf-8")
-        headers = {**self._headers()}
+        headers = {**self._headers(use)}
         if data is not None:
             headers["Content-Type"] = "application/json"
         req = urllib.request.Request(

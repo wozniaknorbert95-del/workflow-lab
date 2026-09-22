@@ -27,6 +27,7 @@ if [[ ! -f "$ENV_FILE" ]]; then
 GITHUB_ENGINEER_TOKEN=
 LINEAR_OPS_READ=
 GITHUB_OPS_WRITE=
+GITHUB_OPS_COMMENT=
 OPS_MODE=MANUAL
 OPS_MAX_CONCURRENT=1
 OPS_MAX_RUNS_PER_DAY=8
@@ -37,6 +38,7 @@ EOF
 else
   grep -q '^LINEAR_OPS_READ=' "$ENV_FILE" || printf '\nLINEAR_OPS_READ=\n' >>"$ENV_FILE"
   grep -q '^GITHUB_OPS_WRITE=' "$ENV_FILE" || printf '\nGITHUB_OPS_WRITE=\n' >>"$ENV_FILE"
+  grep -q '^GITHUB_OPS_COMMENT=' "$ENV_FILE" || printf '\nGITHUB_OPS_COMMENT=\n' >>"$ENV_FILE"
   grep -q '^OPS_MODE=' "$ENV_FILE" || printf '\nOPS_MODE=MANUAL\n' >>"$ENV_FILE"
   grep -q '^OPS_RUN_ALL=' "$ENV_FILE" || printf '\nOPS_RUN_ALL=0\n' >>"$ENV_FILE"
   chmod 600 "$ENV_FILE"

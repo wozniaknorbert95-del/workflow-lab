@@ -1,0 +1,28 @@
+name: cursor-wake
+
+# Fine-grained GITHUB_OPS_WRITE can open issues but 403s comments.
+# Cursor Cloud Agent starts on an @cursor *comment*, not issue body.
+# GITHUB_TOKEN here has issues:write — phone Start → create issue → this comments @cursor.
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  wake:
+    if: >-
+      contains(github.event.issue.body, 'Hermes Ops (Linear-first)')
+      && contains(github.event.issue.body, '@cursor')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comment @cursor to start Cloud Agent
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/${GITHUB_REPOSITORY}/issues/${{ github.event.issue.number }}/comments" \
+            -f body="@cursor
+
+Hermes Ops Start — Cloud Agent, take this issue. Do not deploy. Merge after green CI."
