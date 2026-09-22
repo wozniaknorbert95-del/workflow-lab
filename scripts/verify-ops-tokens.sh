@@ -88,29 +88,37 @@ else
       echo "PASS: LIST pulls ${repo} HTTP 200"
     fi
   done
-  # Dry write probe: comment on non-existent issue → 404 (not 401/403 missing scope)
-  code=$(curl -sS -o /tmp/gh-ops-comment.json -w '%{http_code}' -X POST \
-    -H "Authorization: Bearer ${GITHUB_OPS_WRITE}" \
-    -H "Accept: application/vnd.github+json" \
-    -H "X-GitHub-Api-Version: 2022-11-28" \
-    -H "Content-Type: application/json" \
-    "https://api.github.com/repos/${OWNER}/workflow-lab/issues/999999999/comments" \
-    -d '{"body":"@cursor ops-token-canary-dry"}')
-  case "$code" in
-    404|410|422)
-      echo "PASS: comment dry HTTP $code (token moze pisac Issues; issue nie istnieje)"
-      ;;
-    401|403)
-      echo "FAIL: comment dry HTTP $code — brak Issues write albo zly token" >&2
-      fail=1
-      ;;
-    201|200)
-      echo "WARN: comment dry niespodziewanie utworzyl komentarz HTTP $code (issue 999999999?)"
-      ;;
-    *)
-      echo "WARN: comment dry HTTP $code (niespodziewany; sprawdz recznie)"
-      ;;
-  esac
+  # Dry write probe: GITHUB_OPS_COMMENT (or WRITE fallback) on non-existent issue
+  comment_tok="${GITHUB_OPS_COMMENT:-}"
+  comment_name="GITHUB_OPS_COMMENT"
+  if [[ -z "$comment_tok" ]]; then
+    echo "FAIL: GITHUB_OPS_COMMENT pusty — Start nie obudzi Cursor Cloud" >&2
+    fail=1
+  else
+    echo "lens GITHUB_OPS_COMMENT=${#comment_tok}"
+    code=$(curl -sS -o /tmp/gh-ops-comment-tok.json -w '%{http_code}' -X POST \
+      -H "Authorization: Bearer ${comment_tok}" \
+      -H "Accept: application/vnd.github+json" \
+      -H "X-GitHub-Api-Version: 2022-11-28" \
+      -H "Content-Type: application/json" \
+      "https://api.github.com/repos/${OWNER}/workflow-lab/issues/999999999/comments" \
+      -d '{"body":"@cursor ops-comment-canary-dry"}')
+    case "$code" in
+      404|410|422)
+        echo "PASS: ${comment_name} comment dry HTTP $code (Issues write OK; issue nie istnieje)"
+        ;;
+      401|403)
+        echo "FAIL: ${comment_name} comment dry HTTP $code — brak Issues write" >&2
+        fail=1
+        ;;
+      201|200)
+        echo "WARN: ${comment_name} dry niespodziewanie utworzył komentarz HTTP $code"
+        ;;
+      *)
+        echo "WARN: ${comment_name} dry HTTP $code"
+        ;;
+    esac
+  fi
 fi
 
 # --- ENGINEER drift alarm (nie blokuje ops write) ---

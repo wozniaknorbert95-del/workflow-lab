@@ -50,6 +50,11 @@ install -m 644 "$TARGET/docs/ops/hermes-ops-cmd.path.example" /etc/systemd/syste
 sed -i "s|/opt/workflow-lab|$TARGET|g" /etc/systemd/system/hermes-ops.service
 # Phone POST /ops/run writes ops-cmd.json (bind-mount). Path unit kicks tick immediately
 # — vault runs in Docker and cannot systemctl the host.
+# Docker bind-mount trap: ops-cmd.json can become an empty directory.
+if [[ -d "$AKADEMIA_DATA/ops-cmd.json" ]]; then
+  rmdir "$AKADEMIA_DATA/ops-cmd.json" 2>/dev/null || rm -rf "$AKADEMIA_DATA/ops-cmd.json"
+  echo "WARN: ops-cmd.json był katalogiem — usunięty (Docker bind trap)"
+fi
 touch "$AKADEMIA_DATA/ops-cmd.json" 2>/dev/null || true
 chmod 664 "$AKADEMIA_DATA/ops-cmd.json" 2>/dev/null || true
 systemctl daemon-reload

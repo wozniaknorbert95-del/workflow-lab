@@ -8,7 +8,8 @@
 | Env | Rola | Prefiks | Repo |
 |-----|------|---------|------|
 | `GITHUB_ENGINEER_TOKEN` | read-only S1–S6 / phone-loop | `github_pat_` | lab (+ opcjonalnie akademia) |
-| `GITHUB_OPS_WRITE` | `@cursor` + squash-merge po CI | `github_pat_` | **tylko** `workflow-lab` + `dsaas-platform-main` |
+| `GITHUB_OPS_WRITE` | create issue + squash-merge po CI | `github_pat_` | **tylko** `workflow-lab` + `dsaas-platform-main` |
+| `GITHUB_OPS_COMMENT` | **jedyny** token `POST /comments` `@cursor` (Cloud wake) | `github_pat_` | `workflow-lab` Issues: Read and write |
 | `LINEAR_OPS_READ` | kolejka Linear (bez opisu issue → LLM) | `lin_api_` | workspace QuietForge |
 
 Rotacja: **90 dni**. Zero deploy z timera (Zasada 11).
@@ -54,7 +55,9 @@ ssh root@185.243.54.115 "bash /opt/workflow-lab/scripts/verify-ops-tokens.sh"
 W `/etc/workflow-lab/hermes-engineer.env` (chmod **600**):
 
 - `LINEAR_OPS_READ` — jak wyżej; po sukcesie tick `source=linear_api`, `reason=vps_timer`.
-- `GITHUB_OPS_WRITE` — Run next / merge; bez niego kolejka może żyć, write nie.
+- `GITHUB_OPS_WRITE` — create issue / merge.
+- `GITHUB_OPS_COMMENT` — **wymagany** do `POST /comments` `@cursor`. WRITE często 403 na komentarzach. Kanarek: `verify-ops-tokens.sh` (dry 404, never 403).
+- `OPS_MAX_RUNS_PER_DAY` — default kodu **8**. Smoke/ops na VPS może być **32** (udokumentowany sufit, nie cichy hotfix). Reset 00:00 UTC.
 - `GITHUB_ENGINEER_TOKEN` — read-only (osobny prefill `open-engineer-pat-prefill.ps1`).
 - `OPS_MODE=MANUAL` | `AUTOPILOT` | `SUPERVISED`.
 - `OPS_RUN_ALL=0` — Run all tylko gdy świadomie `1`.

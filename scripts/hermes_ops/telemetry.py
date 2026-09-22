@@ -68,6 +68,7 @@ def today_stats(path: Path | None = None, day: str | None = None) -> dict[str, A
             "waiting": 0,
             "tokens": None,
             "cost": None,
+            "cap": OPS_MAX_RUNS_PER_DAY,
         }
     for raw in target.read_text(encoding="utf-8").splitlines():
         if not raw.strip() or not raw.startswith("{"):
@@ -105,6 +106,7 @@ def today_stats(path: Path | None = None, day: str | None = None) -> dict[str, A
         "waiting": waiting,
         "tokens": tokens_sum if has_tokens else None,
         "cost": round(cost_sum, 4) if has_cost else None,
+        "cap": OPS_MAX_RUNS_PER_DAY,
     }
 
 
