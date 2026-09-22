@@ -74,6 +74,9 @@ class Engine:
             self.lock_path.unlink()
 
     def busy(self) -> bool:
+        # Pause/Stop means the slot is free — leftover lock must not refuse Start.
+        if self.engine_state in ("PAUSED", "STOPPED"):
+            return False
         lock = self._lock()
         if not lock:
             return False
@@ -136,6 +139,7 @@ class Engine:
 
     def pause(self) -> dict[str, Any]:
         self.engine_state = "PAUSED"
+        self._clear_lock()
         append_event({"kind": "paused", "result": "paused", "agent": self.worker}, self.ledger)
         self.save_state()
         return {"ok": True, "engine": self.engine_state}

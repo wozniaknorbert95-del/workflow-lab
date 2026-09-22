@@ -219,6 +219,8 @@ def main() -> int:
             ledger=ledger,
             state_path=state_file,
         )
+        paused._write_lock({"issue_id": "QUI-201", "started": 1, "repo": "workflow-lab"})
+        paused.engine_state = "RUNNING"
         paused.pause()
         restored = Engine(
             github=gh,
@@ -230,6 +232,8 @@ def main() -> int:
         restored.load_state()
         if restored.engine_state != "PAUSED":
             errors.append(f"Pause ma przetrwać tick, jest {restored.engine_state}")
+        if (tmp_path / "lock2.json").exists() or paused.busy():
+            errors.append("Pause must clear lock so next Start is not refuse_lock")
         picked = paused.pick_next(issues, "")
         if not picked or picked.get("id") != "QUI-201":
             errors.append(f"pick_next MANUAL/pierwszy agent: {picked}")
