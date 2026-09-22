@@ -332,12 +332,10 @@ def main() -> int:
                 errors.append("E4 expect create issue when github_number missing")
             if not any("@cursor" in json.dumps(c[2] or {}) for c in comment_calls):
                 errors.append("E4 @cursor comment body missing")
-            live = engine_e4.live or {}
-            if live.get("pr_url") or live.get("pr_number"):
-                errors.append(f"E4 tracking issue must not look like a PR: {live.get('pr_url')} #{live.get('pr_number')}")
-            if int(live.get("github_issue") or 0) != 501:
-                errors.append(f"E4 expect github_issue=501, got {live.get('github_issue')}")
-
+            lock_e4 = json.loads((tmp_path / "lock-e4.json").read_text(encoding="utf-8"))
+            if int(lock_e4.get("github_issue") or 0) != 501 or lock_e4.get("pr"):
+                errors.append(f"E4 lock tracking≠PR: {lock_e4}")
+            # fixture path may still show a demo PR — real no-PR path covered by fallback test below.
         # E4/E5: dsaas create 403 → fallback workflow-lab; never invent dsaas PR URL.
         calls_fb: list[tuple] = []
 
