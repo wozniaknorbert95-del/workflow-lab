@@ -23,6 +23,20 @@ def api_get(path: str, token: str = "") -> Any:
         return json.loads(resp.read().decode("utf-8"))
 
 
+def scrape_cursor_agent(text: str, agent: dict[str, Any]) -> dict[str, Any]:
+    """Fail-closed: only a real https cursor.com/agents URL. Never invent."""
+    agent = dict(agent or {})
+    for token_url in (text or "").replace(")", " ").replace("(", " ").replace('"', " ").replace("'", " ").split():
+        low = token_url.lower()
+        if "cursor.com" in low and ("/agents" in low or "/agent" in low):
+            if low.startswith("http"):
+                agent["run_url"] = token_url.strip(".,;")
+                agent["provider"] = "cursor-cloud"
+                if "/agents/" in low:
+                    agent["run_id"] = token_url.rstrip("/").split("/")[-1][:80]
+    return agent
+
+
 def token_from_env_file(path: str) -> str:
     if not path or not os.path.isfile(path):
         return ""
@@ -76,8 +90,8 @@ def build_live_payload(
             github["cursor_comment"] = any(
                 "@cursor" in (c.get("body") or "").lower() for c in comments
             )
-            # E5: scrape real agent run URL from comments (fail-closed — never invent).
-            agent = {"provider": "", "run_url": "", "model": "", "run_id": ""}
+            # E5: scrape real agent run URL from comments + PR body (fail-closed).
+            agent = scrape_cursor_agent(str(pr.get("body") or ""), {"provider": "", "run_url": "", "model": "", "run_id": ""})
             recent = []
             for c in comments[-15:]:
                 body = c.get("body") or ""
@@ -87,14 +101,7 @@ def build_live_payload(
                         "text": (body[:120] + ("…" if len(body) > 120 else "")),
                     }
                 )
-                for token_url in body.replace(")", " ").replace("(", " ").split():
-                    low = token_url.lower()
-                    if "cursor.com" in low and ("/agents" in low or "/agent" in low):
-                        if low.startswith("http"):
-                            agent["run_url"] = token_url.strip(".,;")
-                            agent["provider"] = "cursor-cloud"
-                            if "/agents/" in low:
-                                agent["run_id"] = token_url.rstrip("/").split("/")[-1][:80]
+                agent = scrape_cursor_agent(body, agent)
             github["agent"] = agent
             github["recent"] = recent[-8:]
             sha = (pr.get("head") or {}).get("sha") or ""

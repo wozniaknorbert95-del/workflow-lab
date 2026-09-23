@@ -203,6 +203,66 @@ class GitHubOps:
             "comment_url": comment_url,
         }
 
+    def find_agent_pull(
+        self,
+        repo: str,
+        *,
+        tracking_issue: int = 0,
+        linear_id: str = "",
+    ) -> dict[str, Any]:
+        """Find the Cloud Agent PR for a tracking issue / Linear id.
+
+        Fail-closed: no match → {}. Never invent a pull number.
+        Prefers body `Closes #<tracking>`; fallback title Linear id + head `cursor/*`.
+        Uses pulls list (not Search API — fine-grained PATs often lack search).
+        """
+        if repo not in ALLOWED_REPOS:
+            return {}
+        tracking_issue = int(tracking_issue or 0)
+        linear_id = str(linear_id or "").strip()
+        if tracking_issue <= 0 and not linear_id:
+            return {}
+        res = self._get(f"/repos/{OWNER}/{repo}/pulls?state=all&per_page=30&sort=updated")
+        if not res.get("ok"):
+            return {}
+        items = res.get("body")
+        if not isinstance(items, list):
+            return {}
+        needles: list[str] = []
+        if tracking_issue > 0:
+            n = str(tracking_issue)
+            needles = [
+                f"closes #{n}",
+                f"close #{n}",
+                f"closed #{n}",
+                f"fixes #{n}",
+                f"fix #{n}",
+            ]
+        linear_u = linear_id.upper()
+        fallback: dict[str, Any] = {}
+        for pr in items:
+            if not isinstance(pr, dict):
+                continue
+            number = int(pr.get("number") or 0)
+            if number <= 0:
+                continue
+            body = str(pr.get("body") or "").lower()
+            title = str(pr.get("title") or "")
+            head = str((pr.get("head") or {}).get("ref") or "")
+            rec = {
+                "number": number,
+                "html_url": str(pr.get("html_url") or ""),
+                "title": title,
+                "head": head,
+                "merged": bool(pr.get("merged_at") or pr.get("merged")),
+            }
+            if needles and any(needle in body for needle in needles):
+                return rec
+            if linear_u and linear_u in title.upper() and head.startswith("cursor/"):
+                if not fallback:
+                    fallback = rec
+        return fallback
+
     def merge_pull(self, repo: str, pull_number: int, checks_green: bool, issue: dict | None = None) -> dict[str, Any]:
         ok, code, reason = allow_merge(repo, checks_green, issue)
         if not ok:
