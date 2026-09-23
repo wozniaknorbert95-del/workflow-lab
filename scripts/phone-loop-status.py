@@ -116,6 +116,8 @@ def evaluate_from_fixture(data: dict[str, Any]) -> dict[str, Any]:
     elif merge.get("squash_on_main"):
         sha = str(merge.get("sha") or "")
         steps.append(_step(6, "PASS", [{"kind": "merge", "method": "squash", "sha": sha}]))
+    elif github.get("draft") or merge.get("draft"):
+        steps.append(_step(6, "FAIL", reason="pr is draft (automerge skipped)"))
     else:
         steps.append(_step(6, "FAIL", reason="not merged to main"))
 

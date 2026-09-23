@@ -407,6 +407,10 @@ def main() -> int:
                 errors.append("E4 expect create issue when github_number missing")
             if not any("@cursor" in json.dumps(c[2] or {}) for c in comment_calls):
                 errors.append("E4 @cursor comment body missing")
+            if not any("NEVER draft" in json.dumps(c[2] or {}) for c in created_calls):
+                errors.append("E4 issue body must forbid draft PRs (D-AUTOMERGE)")
+            if not any("NEVER draft" in json.dumps(c[2] or {}) for c in comment_calls):
+                errors.append("E4 @cursor comment must forbid draft PRs (D-AUTOMERGE)")
             lock_e4 = json.loads((tmp_path / "lock-e4.json").read_text(encoding="utf-8"))
             if int(lock_e4.get("github_issue") or 0) != 501 or lock_e4.get("pr"):
                 errors.append(f"E4 lock tracking≠PR: {lock_e4}")

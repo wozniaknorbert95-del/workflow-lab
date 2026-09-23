@@ -71,6 +71,7 @@ def build_live_payload(
             pr = api_get(f"/repos/{owner}/{name}/pulls/{pr_number}", token)
             github["pr_url"] = pr.get("html_url") or ""
             github["head_ref"] = (pr.get("head") or {}).get("ref") or ""
+            github["draft"] = bool(pr.get("draft"))
             comments = api_get(f"/repos/{owner}/{name}/issues/{pr['number']}/comments", token)
             github["cursor_comment"] = any(
                 "@cursor" in (c.get("body") or "").lower() for c in comments
@@ -136,6 +137,7 @@ def build_live_payload(
                 pass
             review["approved"] = bool(pr.get("merged") or pr.get("merge_commit_sha"))
             merge["squash_on_main"] = bool(pr.get("merged"))
+            merge["draft"] = bool(pr.get("draft"))
             merge["sha"] = (pr.get("merge_commit_sha") or "")[:40]
     except urllib.error.HTTPError as exc:
         if exc.code in (401, 403):

@@ -127,6 +127,7 @@ class GitHubOps:
                 f"@cursor\n\n"
                 f"Automation / Cloud Agent: start from this issue.\n"
                 f"Do not deploy. Merge after green CI.\n"
+                f"Open PR as READY FOR REVIEW (NEVER draft). D-AUTOMERGE requires non-draft PR to auto-merge.\n"
             )
             gh_title = f"[{linear_id}] {title}" if linear_id else title
             # Prefer agent label; fine-grained tokens may ignore unknown labels.
@@ -170,7 +171,10 @@ class GitHubOps:
                 "comment_url": existing.get("html_url"),
             }
 
-        comment_body = f"@cursor\n\nLinear `{linear_id}` — Hermes Ops Start/Run next."
+        comment_body = (
+            f"@cursor\n\nLinear `{linear_id}` — Hermes Ops Start/Run next.\n"
+            f"Open PR as READY FOR REVIEW (NEVER draft). D-AUTOMERGE requires non-draft PR to auto-merge."
+        )
         commented = self.comment_cursor(used_repo, number, comment_body)
         if not commented.get("ok"):
             # Fail-closed: creating the issue is not a wake. Cursor Cloud
