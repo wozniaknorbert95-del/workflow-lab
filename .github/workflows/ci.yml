@@ -52,3 +52,4 @@ jobs:
           python scripts/hermes-operator-brief.py --self-test
           python scripts/test_hermes_ops.py
           python scripts/test_team_desk.py
+          python scripts/test_release_desk.py

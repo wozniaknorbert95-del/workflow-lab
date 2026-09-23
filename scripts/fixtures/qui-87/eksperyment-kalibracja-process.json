@@ -1,0 +1,32 @@
+{
+  "process_id": "analityka.eksperyment-kalibracja",
+  "source": "tenancy/tenants/quietforge/business-rules.json (lab mirror)",
+  "owner": "release-steward",
+  "steps": [
+    {
+      "order": 1,
+      "id": "hypothesis_set",
+      "label_pl": "Sformułowanie hipotezy biznesowej"
+    },
+    {
+      "order": 2,
+      "id": "metric_defined",
+      "label_pl": "Wybór metryki sukcesu"
+    },
+    {
+      "order": 3,
+      "id": "run_experiment",
+      "label_pl": "Wykonanie eksperymentu"
+    },
+    {
+      "order": 4,
+      "id": "record_result",
+      "label_pl": "Zapis wyniku i decyzji"
+    },
+    {
+      "order": 5,
+      "id": "evidence_link",
+      "label_pl": "Powiązanie materiału dowodowego"
+    }
+  ]
+}

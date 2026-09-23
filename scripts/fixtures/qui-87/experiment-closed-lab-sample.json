@@ -1,0 +1,9 @@
+{
+  "experiment_id": "exp_qui87_lab_closed_001",
+  "hypothesis": "Skrócenie cyklu release-desk o 1 dzień poprawi throughput case study bez obniżki jakości dowodu.",
+  "metric": "median_days_hypothesis_to_evidence_link",
+  "result": "median 4.2d → 3.1d (n=12), brak regresji w checklist R7",
+  "decision": "adopt_process_tweak",
+  "evidence_url": "https://github.com/wozniaknorbert95-del/workflow-lab/issues/92",
+  "status": "closed"
+}
