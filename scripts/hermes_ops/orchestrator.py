@@ -239,7 +239,7 @@ class Engine:
                 "code": int(trigger.get("code") or 401),
                 "error": str(trigger.get("error") or "cursor_wake_failed"),
             }
-        # Prefer the repo that actually received @cursor (may fall back to workflow-lab).
+        # Repo that received @cursor must equal Linear target (no lab fallback).
         used_repo = str(trigger.get("repo") or repo)
         # Newly created tracking issues are NOT PRs — do not feed them into PR enrich.
         created_issue = bool(trigger.get("created"))
@@ -409,7 +409,7 @@ class Engine:
                 "github_number": lock.get("pr") or 0,
             },
         )
-        # Keep lock.repo (may differ from Linear target after create fallback).
+        # Keep lock.repo (equals Linear target; no cross-repo wake).
         if lock.get("repo"):
             match = {**match, "repo": lock.get("repo")}
         if lock.get("title") and not match.get("title"):

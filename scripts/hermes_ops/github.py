@@ -14,6 +14,48 @@ WRITE_TOKEN = os.environ.get("GITHUB_OPS_WRITE", "")
 # Comments wake Cursor Cloud. Fine-grained GITHUB_OPS_WRITE often 403s on comments.
 COMMENT_TOKEN = os.environ.get("GITHUB_OPS_COMMENT", "").strip()
 OWNER = os.environ.get("GITHUB_OPS_OWNER", "wozniaknorbert95-del")
+PLATFORM_REPO = "dsaas-platform-main"
+LAB_REPO = "workflow-lab"
+NEVER_DRAFT_LINE = (
+    "Open PR as READY FOR REVIEW (NEVER draft). "
+    "D-AUTOMERGE requires non-draft PR to auto-merge."
+)
+
+
+def cursor_wake_bodies(repo: str, issue: dict[str, Any]) -> tuple[str, str]:
+    """Issue body + @cursor comment. Cloud clones `repo` — text must match that clone."""
+    linear_id = str(issue.get("id") or issue.get("identifier") or "").strip() or "?"
+    url = str(issue.get("url") or "")
+    if repo == PLATFORM_REPO:
+        bootstrap = (
+            "SESSION BOOTSTRAP (dsaas-platform-main):\n"
+            "1. Read AGENTS.md, then `.cursor/README.md`.\n"
+            f"2. Run `python scripts/session-preflight.py {linear_id}` (read-only).\n"
+            "3. LANE=UNKNOWN or STOP = do not implement. UNKNOWN is not PASS.\n"
+            "4. One issue, feature branch ≠ main. Do not mix dirty worktrees.\n"
+            "5. Never: deploy, SSH, secrets, workflow_dispatch, production GO.\n"
+            "6. Stay in this repo. Do not retarget workflow-lab.\n"
+            f"7. {NEVER_DRAFT_LINE}\n"
+        )
+    else:
+        bootstrap = (
+            f"You are in {LAB_REPO} (delivery gym), not {PLATFORM_REPO}.\n"
+            "Do not deploy. Merge after green CI.\n"
+            f"{NEVER_DRAFT_LINE}\n"
+        )
+    header = (
+        f"Hermes Ops (Linear-first)\n\n"
+        f"- Linear: {linear_id}\n"
+        f"- URL: {url}\n"
+        f"- Target repo: {repo}\n\n"
+        f"@cursor\n\n"
+        f"{bootstrap}"
+    )
+    comment = (
+        f"@cursor\n\nLinear `{linear_id}` — Hermes Ops Start/Run next.\n\n"
+        f"{bootstrap}"
+    )
+    return header, comment
 
 
 class GitHubOps:
@@ -105,7 +147,8 @@ class GitHubOps:
         run_next skipped @cursor forever — root cause of QUI-70 'agent never started'.
 
         Fine-grained PATs often cannot use Search API — skip search, create/find by
-        create-or-comment. Prefer `workflow-lab` when target repo rejects create (403).
+        create-or-comment. Never retarget: a 403 on dsaas-platform-main is
+        `target_repo_create_forbidden`, not a silent workflow-lab issue.
         """
         if repo not in ALLOWED_REPOS:
             return {"ok": False, "code": 403, "error": "repo_not_in_policy"}
@@ -117,36 +160,29 @@ class GitHubOps:
         created = False
         used_repo = repo
         created_res: dict[str, Any] = {}
+        issue_body, comment_body = cursor_wake_bodies(repo, issue)
 
         def _create_on(target: str) -> dict[str, Any]:
-            body = (
-                f"Hermes Ops (Linear-first)\n\n"
-                f"- Linear: {linear_id or '?'}\n"
-                f"- URL: {issue.get('url') or ''}\n"
-                f"- Target repo: {repo}\n\n"
-                f"@cursor\n\n"
-                f"Automation / Cloud Agent: start from this issue.\n"
-                f"Do not deploy. Merge after green CI.\n"
-                f"Open PR as READY FOR REVIEW (NEVER draft). D-AUTOMERGE requires non-draft PR to auto-merge.\n"
-            )
             gh_title = f"[{linear_id}] {title}" if linear_id else title
             # Prefer agent label; fine-grained tokens may ignore unknown labels.
-            res = self.create_issue(target, gh_title, body, labels=["agent"])
+            res = self.create_issue(target, gh_title, issue_body, labels=["agent"])
             if not res.get("ok") and int(res.get("code") or 0) in (403, 422):
-                res = self.create_issue(target, gh_title, body, labels=None)
+                res = self.create_issue(target, gh_title, issue_body, labels=None)
             return res
 
         if number <= 0:
             created_res = _create_on(used_repo)
-            if not created_res.get("ok") and used_repo != "workflow-lab":
-                used_repo = "workflow-lab"
-                created_res = _create_on(used_repo)
             if not created_res.get("ok"):
+                code = int(created_res.get("code") or 599)
+                err = str(created_res.get("error") or "create_issue_failed")
+                if used_repo == PLATFORM_REPO and code in (401, 403):
+                    err = "target_repo_create_forbidden"
                 return {
                     "ok": False,
-                    "code": created_res.get("code") or 599,
-                    "error": created_res.get("error") or "create_issue_failed",
+                    "code": code,
+                    "error": err,
                     "detail": created_res.get("detail") or "",
+                    "repo": used_repo,
                 }
             number = int(((created_res.get("body") or {}).get("number")) or 0)
             created = True
@@ -171,10 +207,6 @@ class GitHubOps:
                 "comment_url": existing.get("html_url"),
             }
 
-        comment_body = (
-            f"@cursor\n\nLinear `{linear_id}` — Hermes Ops Start/Run next.\n"
-            f"Open PR as READY FOR REVIEW (NEVER draft). D-AUTOMERGE requires non-draft PR to auto-merge."
-        )
         commented = self.comment_cursor(used_repo, number, comment_body)
         if not commented.get("ok"):
             # Fail-closed: creating the issue is not a wake. Cursor Cloud
