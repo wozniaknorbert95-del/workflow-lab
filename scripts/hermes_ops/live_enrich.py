@@ -196,7 +196,7 @@ def enrich_live(
         gh_issue_url = f"https://github.com/wozniaknorbert95-del/{repo}/issues/{github_issue}"
     return {
         "issue": issue_id,
-        "title": issue.get("title") or "",
+        "title": issue.get("title") or lock.get("title") or "",
         "repo": repo,
         "worker": worker,
         "action": "@cursor" if worker == "cursor" else worker,
@@ -228,7 +228,9 @@ def build_approval(
 ) -> list[dict[str, Any]]:
     """HITL local cards + CI-green waiting (status only — never Merge button)."""
     cards: list[dict[str, Any]] = []
-    for item in lanes.get("local") or []:
+    local_items = list(lanes.get("local") or [])
+    hitl_cap = 3
+    for item in local_items[:hitl_cap]:
         cards.append(
             {
                 "kind": "hitl_local",
@@ -238,6 +240,17 @@ def build_approval(
                 "repo": item.get("repo") or "",
                 "message": "Zostaw na laptopie — brak agent / hitl:approval-required",
                 "actions": ["pause", "stop", "open_linear"],
+            }
+        )
+    extra = len(local_items) - hitl_cap
+    if extra > 0:
+        cards.append(
+            {
+                "kind": "hitl_more",
+                "id": "",
+                "title": f"+{extra} na laptopie",
+                "message": "Reszta HITL — nie na telefonie.",
+                "actions": ["pause", "stop"],
             }
         )
     if live and str((live.get("checks") or {}).get("overall") or "").upper() == "PASS":

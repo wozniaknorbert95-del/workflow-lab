@@ -575,6 +575,181 @@ def main() -> int:
         finally:
             ghmod.COMMENT_TOKEN = old_comment
 
+    # T0: find_agent_pull + observe automerge DONE (no second PUT merge).
+    from phone_loop_github import scrape_cursor_agent
+
+    scraped = scrape_cursor_agent(
+        "see https://cursor.com/agents/bc-a5c50c3f-9b81-41bf-8cd5-cea77f7d3be7 footer",
+        {},
+    )
+    if "cursor.com/agents/bc-a5c50c3f" not in str(scraped.get("run_url") or ""):
+        errors.append(f"scrape PR-body agent URL: {scraped}")
+    if scrape_cursor_agent("no link here", {}).get("run_url"):
+        errors.append("scrape must not invent agent URL")
+
+    ten_local = [{"id": f"QUI-{i}", "title": f"t{i}", "repo": "dsaas-platform-main"} for i in range(10)]
+    c10 = build_approval({"local": ten_local}, None)
+    hitl_n = sum(1 for c in c10 if c.get("kind") == "hitl_local")
+    more = [c for c in c10 if c.get("kind") == "hitl_more"]
+    if hitl_n != 3:
+        errors.append(f"HITL phone cap 3, got {hitl_n}")
+    if not more or "+7" not in str(more[0].get("title") or ""):
+        errors.append(f"HITL +7 remainder card missing: {more}")
+
+    def fetch_find(method, path, payload):
+        if method == "GET" and "/pulls" in str(path):
+            return {
+                "ok": True,
+                "code": 200,
+                "body": [
+                    {
+                        "number": 93,
+                        "html_url": "https://github.com/wozniaknorbert95-del/workflow-lab/pull/93",
+                        "title": "[QUI-87] analytics",
+                        "body": "Closes #92\nlab mirror",
+                        "head": {"ref": "cursor/qui-87"},
+                        "merged_at": "2026-09-23T20:00:33Z",
+                    }
+                ],
+            }
+        return {"ok": True, "code": 200, "body": []}
+
+    found = GitHubOps(token="test", fetch=fetch_find).find_agent_pull(
+        "workflow-lab", tracking_issue=92, linear_id="QUI-87"
+    )
+    if int(found.get("number") or 0) != 93:
+        errors.append(f"find_agent_pull Closes #92 expect 93, got {found}")
+
+    def fetch_no_pr(method, path, payload):
+        if method == "GET" and "/pulls" in str(path):
+            return {"ok": True, "code": 200, "body": []}
+        return {"ok": True, "code": 200, "body": []}
+
+    missing = GitHubOps(token="test", fetch=fetch_no_pr).find_agent_pull(
+        "workflow-lab", tracking_issue=92, linear_id="QUI-87"
+    )
+    if missing:
+        errors.append(f"find_agent_pull no match must be empty, got {missing}")
+
+    import time as time_mod
+
+    with tempfile.TemporaryDirectory() as tmp2:
+        t2 = Path(tmp2)
+        lock2 = t2 / "lock.json"
+        ledger2 = t2 / "ledger.jsonl"
+        eng_obs = Engine(
+            github=GitHubOps(token="test", fetch=fetch_find),
+            mode="AUTOPILOT",
+            lock_path=lock2,
+            ledger=ledger2,
+            state_path=t2 / "state.json",
+            github_read_token="",
+        )
+        eng_obs.engine_state = "RUNNING"
+        eng_obs._write_lock(
+            {
+                "issue_id": "QUI-87",
+                "title": "Analytics lab",
+                "started": time_mod.time(),
+                "repo": "workflow-lab",
+                "pr": None,
+                "github_issue": 92,
+                "cursor_triggered": True,
+                "wake_state": "commented",
+            }
+        )
+        happy = load_phone_fixture("happy")
+        eng_obs.refresh_live([], fixture=happy)
+        if eng_obs.engine_state != "PAUSED":
+            errors.append(f"observe merge must PAUSE, got {eng_obs.engine_state}")
+        if lock2.exists():
+            errors.append("observe merge must clear lock")
+        live_obs = eng_obs.live or {}
+        if live_obs.get("title") != "Analytics lab":
+            errors.append(f"lock.title must survive Linear drop, got {live_obs.get('title')!r}")
+        if int(live_obs.get("pr_number") or 0) != 93:
+            errors.append(f"discovered PR expect 93, got {live_obs.get('pr_number')}")
+        if live_obs.get("repo") != "workflow-lab":
+            errors.append(f"live.repo expect workflow-lab, got {live_obs.get('repo')}")
+        ledger_txt = ledger2.read_text(encoding="utf-8") if ledger2.is_file() else ""
+        if '"kind": "merged"' not in ledger_txt:
+            errors.append("observe merge must append kind=merged")
+        stats = today_stats(ledger2)
+        if int(stats.get("merged") or 0) < 1:
+            errors.append(f"today.merged after observe expect >=1, got {stats}")
+        tick_after = eng_obs.tick(issues)
+        if tick_after.get("skipped") != "PAUSED":
+            errors.append(f"tick after DONE must skip PAUSED, got {tick_after}")
+        if ledger_txt.count('"kind": "run_next"') != ledger2.read_text(encoding="utf-8").count(
+            '"kind": "run_next"'
+        ):
+            errors.append("tick after DONE must not run_next")
+
+        eng_wait = Engine(
+            github=GitHubOps(token="test", fetch=fetch_no_pr),
+            mode="AUTOPILOT",
+            lock_path=t2 / "lock-wait.json",
+            ledger=t2 / "ledger-wait.jsonl",
+            state_path=t2 / "state-wait.json",
+            github_read_token="",
+        )
+        eng_wait.engine_state = "RUNNING"
+        wait_lock = t2 / "lock-wait.json"
+        eng_wait._write_lock(
+            {
+                "issue_id": "QUI-87",
+                "title": "Analytics lab",
+                "started": time_mod.time(),
+                "repo": "workflow-lab",
+                "pr": 93,
+                "github_issue": 92,
+                "cursor_triggered": True,
+                "wake_state": "commented",
+            }
+        )
+        mid = dict(happy)
+        mid["merge"] = {"squash_on_main": False}
+        mid["review"] = {"approved": False}
+        eng_wait.refresh_live([], fixture=mid)
+        if not wait_lock.exists():
+            errors.append("open PR must keep lock")
+        if eng_wait.engine_state != "RUNNING":
+            errors.append(f"open PR must stay RUNNING, got {eng_wait.engine_state}")
+        wait_ledger = (t2 / "ledger-wait.jsonl").read_text(encoding="utf-8") if (t2 / "ledger-wait.jsonl").is_file() else ""
+        if '"kind": "merged"' in wait_ledger:
+            errors.append("open PR must not record merged")
+
+        eng_none = Engine(
+            github=GitHubOps(token="test", fetch=fetch_no_pr),
+            mode="AUTOPILOT",
+            lock_path=t2 / "lock-none.json",
+            ledger=t2 / "ledger-none.jsonl",
+            state_path=t2 / "state-none.json",
+            github_read_token="",
+        )
+        eng_none.engine_state = "RUNNING"
+        none_lock = t2 / "lock-none.json"
+        eng_none._write_lock(
+            {
+                "issue_id": "QUI-87",
+                "started": time_mod.time(),
+                "repo": "workflow-lab",
+                "pr": None,
+                "github_issue": 92,
+                "cursor_triggered": True,
+                "wake_state": "commented",
+            }
+        )
+        eng_none.refresh_live([], fixture=None)
+        still = json.loads(none_lock.read_text(encoding="utf-8"))
+        if still.get("pr"):
+            errors.append(f"no PR must leave lock.pr empty, got {still.get('pr')}")
+        s3 = next((s for s in (eng_none.live or {}).get("steps") or [] if s.get("step") == 3), {})
+        if str(s3.get("status") or "").upper() == "FAIL":
+            errors.append(f"no PR S3 must not FAIL, got {s3}")
+        if str(s3.get("reason") or "") != "no PR yet" and str(s3.get("status") or "").upper() != "UNKNOWN":
+            errors.append(f"no PR S3 expect UNKNOWN/no PR yet, got {s3}")
+
     if errors:
         print("FAIL:")
         for item in errors:

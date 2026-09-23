@@ -249,6 +249,7 @@ class Engine:
         self._write_lock(
             {
                 "issue_id": issue_id,
+                "title": str(issue.get("title") or "")[:200],
                 "started": started,
                 "repo": used_repo,
                 "pr": existing_pr or None,
@@ -383,16 +384,36 @@ class Engine:
 
     def refresh_live(self, issues: list[dict[str, Any]], *, fixture: dict[str, Any] | None = None) -> None:
         lock = self._lock()
-        issue_id = str(lock.get("issue_id") or (self.live or {}).get("issue") or "")
+        # No lock: keep DONE/ghost snapshot. Do not rediscover (would double-count merged).
+        if not lock:
+            return
+        issue_id = str(lock.get("issue_id") or "")
         if not issue_id:
             return
+        if not lock.get("pr"):
+            found = self.github.find_agent_pull(
+                str(lock.get("repo") or "workflow-lab"),
+                tracking_issue=int(lock.get("github_issue") or 0),
+                linear_id=issue_id,
+            )
+            pr_n = int((found or {}).get("number") or 0)
+            if pr_n > 0:
+                lock = {**lock, "pr": pr_n}
+                self._write_lock(lock)
         match = next(
             (i for i in issues if str(i.get("id") or i.get("identifier") or "") == issue_id),
-            {"id": issue_id, "repo": lock.get("repo"), "github_number": lock.get("pr") or 0},
+            {
+                "id": issue_id,
+                "title": lock.get("title") or "",
+                "repo": lock.get("repo"),
+                "github_number": lock.get("pr") or 0,
+            },
         )
         # Keep lock.repo (may differ from Linear target after create fallback).
         if lock.get("repo"):
             match = {**match, "repo": lock.get("repo")}
+        if lock.get("title") and not match.get("title"):
+            match = {**match, "title": lock.get("title")}
         if lock.get("pr"):
             match = {**match, "github_number": lock.get("pr")}
         elif "github_number" in match and not lock.get("pr"):
@@ -409,6 +430,36 @@ class Engine:
             if lock.get("cursor_triggered")
             else None,
         )
+        self._observe_merge_if_done()
+
+    def _observe_merge_if_done(self) -> None:
+        """GitHub D-AUTOMERGE already squashed — record DONE, do not PUT merge again."""
+        live = self.live if isinstance(self.live, dict) else {}
+        steps = live.get("steps") if isinstance(live.get("steps"), list) else []
+        s6 = next((s for s in steps if int((s or {}).get("step") or 0) == 6), None)
+        s6_ok = str((s6 or {}).get("status") or "").upper() == "PASS"
+        passed = sum(1 for s in steps if str((s or {}).get("status") or "").upper() == "PASS")
+        pr = live.get("pr_number")
+        has_pr = pr is not None and str(pr).strip() not in ("", "0")
+        if not s6_ok or passed < 6 or not has_pr:
+            return
+        append_event(
+            {
+                "kind": "merged",
+                "repo": live.get("repo"),
+                "pr": pr,
+                "issue": live.get("issue"),
+                "agent": self.worker,
+                "result": "merged",
+                "input_tokens": None,
+                "output_tokens": None,
+                "cost": None,
+            },
+            self.ledger,
+        )
+        self.engine_state = "PAUSED"
+        self._clear_lock()
+        self.save_state()
 
     def status_payload(self, issues: list[dict[str, Any]]) -> dict[str, Any]:
         route_mode = "AUTOPILOT" if self.mode == "SUPERVISED" else self.mode
