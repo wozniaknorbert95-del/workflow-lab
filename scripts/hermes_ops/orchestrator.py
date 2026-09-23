@@ -88,6 +88,7 @@ class Engine:
                 {"kind": "stale_lock", "result": "cleared", "agent": self.worker},
                 self.ledger,
             )
+            self.save_state()
             return False
         return True
 
@@ -358,6 +359,11 @@ class Engine:
             return {"ok": True, "skipped": "MANUAL", "lanes": lanes}
         if self.busy():
             return {"ok": True, "skipped": "busy", "lanes": lanes}
+        # busy() on TTL expiry sets PAUSED and returns False (slot free for phone Start).
+        # Re-check: Autopilot must NOT run_next again — that re-woke QUI-88 every 15 min
+        # and burned OPS_MAX_RUNS_PER_DAY (2026-09-23: 32× run_next, 0 merges).
+        if self.engine_state in ("PAUSED", "STOPPED"):
+            return {"ok": True, "skipped": "stale_lock", "lanes": lanes}
         # SUPERVISED: never auto-start HITL (already local). Autopilot queue only.
         queue = lanes[LANE_AUTOPILOT]
         if not queue:

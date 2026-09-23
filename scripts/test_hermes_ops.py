@@ -153,6 +153,36 @@ def main() -> int:
         if not tick.get("ok") and tick.get("code") == 403:
             errors.append(f"autopilot tick: {tick}")
 
+        # Stale lock TTL: busy() frees the slot for phone Start, but tick must NOT
+        # run_next again (overnight QUI-88 re-wake burned the daily cap).
+        import time as _time
+
+        engine.mode = "AUTOPILOT"
+        engine.engine_state = "RUNNING"
+        engine.live = None
+        engine._write_lock(
+            {
+                "issue_id": "QUI-88",
+                "started": _time.time() - (16 * 60),
+                "repo": "workflow-lab",
+            }
+        )
+        run_next_before = 0
+        if ledger.is_file():
+            run_next_before = ledger.read_text(encoding="utf-8").count('"kind": "run_next"')
+        stale_tick = engine.tick(issues)
+        if stale_tick.get("skipped") != "stale_lock":
+            errors.append(f"stale lock tick must skip stale_lock, got {stale_tick}")
+        if engine.engine_state != "PAUSED":
+            errors.append(f"stale lock must leave engine PAUSED, got {engine.engine_state}")
+        run_next_after = 0
+        if ledger.is_file():
+            run_next_after = ledger.read_text(encoding="utf-8").count('"kind": "run_next"')
+        if run_next_after != run_next_before:
+            errors.append(
+                f"stale lock must not append run_next (before={run_next_before} after={run_next_after})"
+            )
+
         append_event(
             {
                 "kind": "merged",
