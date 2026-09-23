@@ -1,0 +1,50 @@
+{
+  "version": "qui-88-v1",
+  "business_rules_source": "tenancy/tenants/quietforge/business-rules.json",
+  "desk_type": "team-desk",
+  "steps": [
+    {
+      "step_number": 1,
+      "id": "draft_submission",
+      "name": "Zgłoszenie zapotrzebowania",
+      "requires_hitl": false,
+      "allowed_transitions": ["role_budget_verification"]
+    },
+    {
+      "step_number": 2,
+      "id": "role_budget_verification",
+      "name": "Weryfikacja budżetu i limitu etatów",
+      "requires_hitl": false,
+      "allowed_transitions": ["compliance_check", "rejected"]
+    },
+    {
+      "step_number": 3,
+      "id": "compliance_check",
+      "name": "Weryfikacja ról R1-R7 i uprawnień",
+      "requires_hitl": false,
+      "allowed_transitions": ["dowodca_approval", "rejected"]
+    },
+    {
+      "step_number": 4,
+      "id": "dowodca_approval",
+      "name": "Decyzja Dowódcy (Human-in-the-Loop)",
+      "requires_hitl": true,
+      "gate": "R7",
+      "allowed_transitions": ["seat_allocation", "rejected"]
+    },
+    {
+      "step_number": 5,
+      "id": "seat_allocation",
+      "name": "Alokacja miejsca na team-desk",
+      "requires_hitl": false,
+      "allowed_transitions": ["allocated"]
+    }
+  ],
+  "verification_tests": [
+    { "id": "HR-01", "scenario": "missing_tenant_id", "expect": "fail_closed" },
+    { "id": "HR-02", "scenario": "cross_tenant_access", "expect": "fail_closed" },
+    { "id": "HR-03", "scenario": "skip_dowodca_approval", "expect": "fail_closed" },
+    { "id": "HR-04", "scenario": "pii_candidate_payload", "expect": "fail_closed" },
+    { "id": "HR-05", "scenario": "budget_limit_exceeded", "expect": "rejected_step_2" }
+  ]
+}
