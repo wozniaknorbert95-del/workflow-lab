@@ -69,6 +69,21 @@ def main() -> int:
             if f'"{banned}"' in schema_raw:
                 errors.append(f"qui-88: hiring request schema must not define PII/private field {banned}")
 
+    qui87_template = ROOT / "scripts" / "fixtures" / "qui-87" / "experiment-entry-template.json"
+    qui87_process = ROOT / "scripts" / "fixtures" / "qui-87" / "eksperyment-kalibracja-process.json"
+    if qui87_template.is_file():
+        t_data = json.loads(qui87_template.read_text(encoding="utf-8"))
+        req_fields = t_data.get("required_fields") or []
+        for field in ("hypothesis", "metric", "result", "decision", "evidence_url"):
+            if field not in req_fields:
+                errors.append(f"qui-87: template missing required field {field}")
+    if qui87_process.is_file():
+        p_data = json.loads(qui87_process.read_text(encoding="utf-8"))
+        if p_data.get("owner") != "release-steward":
+            errors.append(f"qui-87: process owner expected release-steward, got {p_data.get('owner')}")
+        if len(p_data.get("steps") or []) < 5:
+            errors.append("qui-87: process must have ≥5 steps")
+
     fixture = ROOT / "scripts" / "fixtures" / "hermes-ops" / "labels_three.json"
     issues = load_fixture(fixture)
     load_phone_fixture = _load_phone_loop().load_fixture

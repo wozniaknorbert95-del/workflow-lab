@@ -1,0 +1,23 @@
+{
+  "schema": "quietforge.experiment-ledger.v1",
+  "process_id": "analityka.eksperyment-kalibracja",
+  "owner_worker": "release-steward",
+  "required_fields": [
+    "experiment_id",
+    "hypothesis",
+    "metric",
+    "result",
+    "decision",
+    "evidence_url"
+  ],
+  "append_only": true,
+  "template": {
+    "experiment_id": "exp_<ulid>",
+    "hypothesis": "",
+    "metric": "",
+    "result": "",
+    "decision": "",
+    "evidence_url": "https://",
+    "status": "open"
+  }
+}
