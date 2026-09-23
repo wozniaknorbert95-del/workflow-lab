@@ -48,6 +48,19 @@ def main() -> int:
     if empty["status"] == "PASS":
         errors.append("empty fixture must not PASS")
 
+    # Draft PR: S6 names the D-AUTOMERGE skip, not a generic "not merged".
+    draft = {
+        "linear": happy["linear"],
+        "github": {**happy["github"], "draft": True},
+        "checks": happy["checks"],
+        "review": happy["review"],
+        "merge": {"squash_on_main": False},
+    }
+    d = mod.evaluate_from_fixture(draft)
+    s6 = next((s for s in d["steps"] if s.get("step") == 6), {})
+    if s6.get("status") != "FAIL" or s6.get("reason") != "pr is draft (automerge skipped)":
+        errors.append(f"draft PR S6 expected FAIL 'pr is draft (automerge skipped)', got {s6}")
+
     if errors:
         print("FAIL phone-loop-status:")
         for e in errors:

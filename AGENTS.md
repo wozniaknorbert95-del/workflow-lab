@@ -30,7 +30,7 @@ It is **not** `dsaas-platform-main`. Never copy platform canon here. Never deplo
 12. Every MR links an issue (`Closes #123`) and says: what, why, how tested.
 13. Code/comments/commits in **English**. User-facing docs may be Polish.
 14. If you lack permission or the task exceeds scope — stop and describe the blocker.
-15. Merge is **automatic** (D-AUTOMERGE). A non-draft PR with green required checks auto-merges (squash). Add the `no-automerge` label to hold a PR. Never push to `main`.
+15. Merge is **automatic** (D-AUTOMERGE). A non-draft PR with green required checks auto-merges (squash). Never mark PR as draft unless explicitly requested. D-AUTOMERGE operates only on non-draft PRs. Add the `no-automerge` label to hold a PR. Never push to `main`.
 16. Deploy of `dsaas-platform-main` is out of scope forever.
 
 ## 2. Project commands (truth — same as CI)
