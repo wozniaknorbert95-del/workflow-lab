@@ -171,6 +171,36 @@ def main() -> int:
         if not tick.get("ok") and tick.get("code") == 403:
             errors.append(f"autopilot tick: {tick}")
 
+        # Stale lock TTL: busy() frees the slot for phone Start, but tick must NOT
+        # run_next again (overnight QUI-88 re-wake burned the daily cap).
+        import time as _time
+
+        engine.mode = "AUTOPILOT"
+        engine.engine_state = "RUNNING"
+        engine.live = None
+        engine._write_lock(
+            {
+                "issue_id": "QUI-88",
+                "started": _time.time() - (16 * 60),
+                "repo": "workflow-lab",
+            }
+        )
+        run_next_before = 0
+        if ledger.is_file():
+            run_next_before = ledger.read_text(encoding="utf-8").count('"kind": "run_next"')
+        stale_tick = engine.tick(issues)
+        if stale_tick.get("skipped") != "stale_lock":
+            errors.append(f"stale lock tick must skip stale_lock, got {stale_tick}")
+        if engine.engine_state != "PAUSED":
+            errors.append(f"stale lock must leave engine PAUSED, got {engine.engine_state}")
+        run_next_after = 0
+        if ledger.is_file():
+            run_next_after = ledger.read_text(encoding="utf-8").count('"kind": "run_next"')
+        if run_next_after != run_next_before:
+            errors.append(
+                f"stale lock must not append run_next (before={run_next_before} after={run_next_after})"
+            )
+
         append_event(
             {
                 "kind": "merged",
@@ -353,6 +383,10 @@ def main() -> int:
             errors.append(f"write_refuse: {blob} exists={refuse_path.is_file()}")
         if refuse_reason_from_result({"ok": False, "code": 429, "error": "daily_cap"}) != "cap_OPS_MAX_RUNS_PER_DAY":
             errors.append("refuse_reason daily_cap mapping")
+        if refuse_reason_from_result({"ok": False, "code": 403, "error": "cursor_wake_forbidden"}) != "cursor_wake_forbidden":
+            errors.append("refuse_reason cursor_wake_forbidden mapping")
+        if refuse_reason_from_result({"ok": False, "code": 401, "error": "missing_GITHUB_OPS_COMMENT"}) != "missing_GITHUB_OPS_COMMENT":
+            errors.append("refuse_reason missing_GITHUB_OPS_COMMENT mapping")
 
         bare = {"id": "QUI-ZZ", "title": "no gh yet", "repo": "workflow-lab", "labels": ["agent"]}
         engine_e4 = Engine(
@@ -376,8 +410,12 @@ def main() -> int:
             lock_e4 = json.loads((tmp_path / "lock-e4.json").read_text(encoding="utf-8"))
             if int(lock_e4.get("github_issue") or 0) != 501 or lock_e4.get("pr"):
                 errors.append(f"E4 lock tracking≠PR: {lock_e4}")
+            if lock_e4.get("wake_state") not in ("commented", "already"):
+                errors.append(f"E4 lock wake_state: {lock_e4.get('wake_state')}")
+            if engine_e4.engine_state != "RUNNING":
+                errors.append(f"E4 comment 201 must be RUNNING, got {engine_e4.engine_state}")
             # fixture path may still show a demo PR — real no-PR path covered by fallback test below.
-        # E4/E5: dsaas create 403 → fallback workflow-lab; never invent dsaas PR URL.
+        # Fail-closed: comment 403 after create is REFUSED, never fake RUNNING.
         calls_fb: list[tuple] = []
 
         def fetch_fallback(method, path, payload):
@@ -414,21 +452,109 @@ def main() -> int:
             "github_number": 0,
         }
         out_fb = engine_fb.run_next(dsaas_bare)
-        if not out_fb.get("ok"):
-            errors.append(f"E4 fallback create expect ok: {out_fb}")
+        if out_fb.get("ok"):
+            errors.append(f"comment 403 must REFUSE, got ok: {out_fb}")
+        if str(out_fb.get("error") or "") != "cursor_wake_forbidden":
+            errors.append(f"comment 403 error expect cursor_wake_forbidden, got {out_fb}")
+        if engine_fb.engine_state == "RUNNING":
+            errors.append("comment 403 must not set RUNNING")
+        if (tmp_path / "lock-fb.json").exists():
+            errors.append("comment 403 must clear lock")
+
+        # Same fallback create, but comment 201 → wake_state=commented, RUNNING, no invented PR.
+        calls_ok: list[tuple] = []
+
+        def fetch_ok(method, path, payload):
+            calls_ok.append((method, path, payload))
+            if method == "POST" and "/dsaas-platform-main/issues" in path and "/comments" not in path:
+                return {"ok": False, "code": 403, "error": "http_403", "detail": "Resource not accessible"}
+            if method == "POST" and path.rstrip("/").endswith("/issues") and "/comments" not in path:
+                return {
+                    "ok": True,
+                    "code": 201,
+                    "body": {
+                        "number": 77,
+                        "html_url": "https://github.com/wozniaknorbert95-del/workflow-lab/issues/77",
+                    },
+                }
+            if method == "POST" and "comments" in path:
+                return {
+                    "ok": True,
+                    "code": 201,
+                    "body": {
+                        "html_url": "https://github.com/wozniaknorbert95-del/workflow-lab/issues/77#issuecomment-9",
+                    },
+                }
+            if method == "GET" and "comments" in path:
+                return {"ok": True, "code": 200, "body": []}
+            return {"ok": True, "code": 200, "body": {}}
+
+        gh_ok = GitHubOps(token="test", fetch=fetch_ok)
+        engine_ok = Engine(
+            github=gh_ok,
+            mode="MANUAL",
+            lock_path=tmp_path / "lock-ok.json",
+            ledger=tmp_path / "ledger-ok.jsonl",
+            state_path=tmp_path / "state-ok.json",
+            github_read_token="",
+        )
+        out_ok = engine_ok.run_next(dsaas_bare)
+        if not out_ok.get("ok"):
+            errors.append(f"comment 201 expect RUNNING ok, got {out_ok}")
         else:
-            live_fb = engine_fb.live or {}
-            if live_fb.get("repo") != "workflow-lab":
-                errors.append(f"E4 fallback repo expect workflow-lab, got {live_fb.get('repo')}")
-            if live_fb.get("pr_url") or live_fb.get("pr_number"):
-                errors.append(f"E4 fallback must not invent PR: {live_fb.get('pr_url')}")
-            if int(live_fb.get("github_issue") or 0) != 77:
-                errors.append(f"E4 fallback github_issue: {live_fb.get('github_issue')}")
-            if "dsaas-platform-main/pull" in json.dumps(live_fb):
-                errors.append("E4 fallback must never point at dsaas pull from tracking issue#")
-            lock_fb = json.loads((tmp_path / "lock-fb.json").read_text(encoding="utf-8"))
-            if lock_fb.get("repo") != "workflow-lab" or lock_fb.get("pr"):
-                errors.append(f"E4 fallback lock: {lock_fb}")
+            live_ok = engine_ok.live or {}
+            if live_ok.get("repo") != "workflow-lab":
+                errors.append(f"fallback repo expect workflow-lab, got {live_ok.get('repo')}")
+            if live_ok.get("pr_url") or live_ok.get("pr_number"):
+                errors.append(f"fallback must not invent PR: {live_ok.get('pr_url')}")
+            if int(live_ok.get("github_issue") or 0) != 77:
+                errors.append(f"fallback github_issue: {live_ok.get('github_issue')}")
+            if live_ok.get("cursor_comment_url") != "https://github.com/wozniaknorbert95-del/workflow-lab/issues/77#issuecomment-9":
+                errors.append(f"fallback comment_url: {live_ok.get('cursor_comment_url')}")
+            if live_ok.get("wake_state") != "commented":
+                errors.append(f"fallback wake_state: {live_ok.get('wake_state')}")
+            if "dsaas-platform-main/pull" in json.dumps(live_ok):
+                errors.append("fallback must never point at dsaas pull from tracking issue#")
+            lock_ok = json.loads((tmp_path / "lock-ok.json").read_text(encoding="utf-8"))
+            if lock_ok.get("repo") != "workflow-lab" or lock_ok.get("pr"):
+                errors.append(f"fallback lock: {lock_ok}")
+            if engine_ok.engine_state != "RUNNING":
+                errors.append(f"comment 201 engine_state: {engine_ok.engine_state}")
+            comment_posts = [c for c in calls_ok if c[0] == "POST" and "comments" in str(c[1])]
+            retry_same = engine_ok.run_next(dsaas_bare)
+            if retry_same.get("code") != 409:
+                errors.append(f"idempotent retry expect 409, got {retry_same}")
+            comment_posts_after = [c for c in calls_ok if c[0] == "POST" and "comments" in str(c[1])]
+            if len(comment_posts_after) != len(comment_posts):
+                errors.append("idempotent retry must not POST a second @cursor comment")
+
+        paused = engine_ok.pause()
+        if paused.get("engine") != "PAUSED" or (tmp_path / "lock-ok.json").exists():
+            errors.append(f"pause must clear lock: {paused} exists={ (tmp_path / 'lock-ok.json').exists() }")
+        other = {
+            "id": "QUI-90",
+            "title": "next",
+            "repo": "workflow-lab",
+            "labels": ["agent"],
+            "github_number": 0,
+        }
+        after_pause = engine_ok.run_next(other)
+        if not after_pause.get("ok"):
+            errors.append(f"pause then start new issue must not refuse_lock: {after_pause}")
+        if str(after_pause.get("error") or "") in ("idempotent", "concurrent"):
+            errors.append(f"pause leftover lock blocked start: {after_pause}")
+
+        import hermes_ops.github as ghmod
+
+        old_comment = ghmod.COMMENT_TOKEN
+        ghmod.COMMENT_TOKEN = ""
+        try:
+            gh_miss = GitHubOps(token="write-only")
+            miss = gh_miss.comment_cursor("workflow-lab", 1)
+            if miss.get("error") != "missing_GITHUB_OPS_COMMENT":
+                errors.append(f"missing comment token: {miss}")
+        finally:
+            ghmod.COMMENT_TOKEN = old_comment
 
     if errors:
         print("FAIL:")

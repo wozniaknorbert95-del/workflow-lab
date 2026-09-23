@@ -13,6 +13,7 @@ Environment=LINEAR_OPS_QUEUE_FILE=/opt/workflow-lab/data/linear-queue.json
 Environment=ACADEMY_DATA_DIR=/opt/akademia/data
 Environment=AKADEMIA_PUSH_SEND=/opt/akademia/scripts/push-send.py
 WorkingDirectory=/opt/workflow-lab
+ExecStartPre=/usr/bin/bash -c 'p=/opt/akademia/data/ops-cmd.json; if [ -d "$p" ]; then rmdir "$p" || true; fi'
 ExecStart=/usr/bin/python3 scripts/hermes-ops-tick.py --status-out /opt/akademia/data/ops-status.json
 # Zero workflow_dispatch / SSH prod. Pause persists in HERMES_OPS_STATE.
 # Without LINEAR_OPS_READ, tick reads LINEAR_OPS_QUEUE_FILE (bootstrap).

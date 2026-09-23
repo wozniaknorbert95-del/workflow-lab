@@ -125,8 +125,6 @@ def main() -> int:
         match = engine.pick_next(issues, wanted)
         if match:
             if engine.mode == "MANUAL" or cmd.get("action") in ("run_next", "retry", "start"):
-                if engine.mode in ("AUTOPILOT", "SUPERVISED") and cmd.get("action") == "start":
-                    engine.engine_state = "RUNNING"
                 last_result = engine.run_next(match, fixture=phone_fx)
                 reason = str(last_result.get("error") or "run_next")
                 if not last_result.get("ok"):

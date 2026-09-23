@@ -1,8 +1,8 @@
 name: cursor-wake
 
-# Fine-grained GITHUB_OPS_WRITE can open issues but 403s comments.
+# Fallback only. Tick success is a 2xx @cursor comment from GITHUB_OPS_COMMENT.
 # Cursor Cloud Agent starts on an @cursor *comment*, not issue body.
-# GITHUB_TOKEN here has issues:write — phone Start → create issue → this comments @cursor.
+# This job comments only Hermes Ops issues and never double-triggers.
 on:
   issues:
     types: [opened]
@@ -18,11 +18,29 @@ jobs:
       && contains(github.event.issue.body, '@cursor')
     runs-on: ubuntu-latest
     steps:
-      - name: Comment @cursor to start Cloud Agent
+      - name: Skip when @cursor wake comment already exists
+        id: dup
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
+          json=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${{ github.event.issue.number }}/comments?per_page=30")
+          if echo "$json" | grep -q '@cursor' && echo "$json" | grep -Eq 'Hermes Ops|Cloud Agent'; then
+            echo "already=true" >> "$GITHUB_OUTPUT"
+            echo "cursor-wake: SKIP already_woken issue #${{ github.event.issue.number }}"
+          else
+            echo "already=false" >> "$GITHUB_OUTPUT"
+            echo "cursor-wake: NEED_COMMENT issue #${{ github.event.issue.number }}"
+          fi
+
+      - name: Comment @cursor to start Cloud Agent
+        if: steps.dup.outputs.already != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
           gh api "repos/${GITHUB_REPOSITORY}/issues/${{ github.event.issue.number }}/comments" \
             -f body="@cursor
 
 Hermes Ops Start — Cloud Agent, take this issue. Do not deploy. Merge after green CI."
+          echo "cursor-wake: COMMENTED issue #${{ github.event.issue.number }} (fallback, not tick success)"

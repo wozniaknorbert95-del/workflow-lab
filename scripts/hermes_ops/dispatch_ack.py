@@ -63,7 +63,10 @@ def refuse_reason_from_result(result: dict[str, Any] | None) -> str | None:
     err = str(result.get("error") or result.get("code") or "refused")
     code = result.get("code")
     mapping = {
+        "missing_GITHUB_OPS_COMMENT": "missing_GITHUB_OPS_COMMENT",
         "missing GITHUB_OPS_WRITE": "missing_GITHUB_OPS_WRITE",
+        "cursor_wake_forbidden": "cursor_wake_forbidden",
+        "cursor_wake_failed": "cursor_wake_failed",
         "daily_cap": "cap_OPS_MAX_RUNS_PER_DAY",
         "concurrent": "lock",
         "idempotent": "lock",
