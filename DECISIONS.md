@@ -2,6 +2,16 @@
 
 One page. Newest first. Every irreversible choice lives here.
 
+## D-NO-DSAAS-FALLBACK (2026-09-23) — platform wake stays on platform
+
+**Decision:** Hermes Ops `ensure_cursor_trigger` never retargets `dsaas-platform-main` → `workflow-lab` when GitHub create/comment returns 403. Fail-closed error is `target_repo_create_forbidden`. A PASS tick on the lab repo for a platform Linear issue is a lie (Cloud clones the issue repo, not the Linear `repo` field).
+
+**Wake text:** `@cursor` issue/comment for platform tickets bootstraps `.cursor/README.md` + `python scripts/session-preflight.py <id>` (UNKNOWN ≠ PASS, no deploy/SSH/secrets, never-draft PR). Lab tickets keep the lab gym prompt and must not instruct dsaas preflight.
+
+**Why:** Silent fallback made akademia `/ops` look RUNNING while Cloud worked in the wrong clone. Platform 403 means PAT/issues permission on `dsaas-platform-main`, not “open a lab issue instead”.
+
+**Evidence:** `scripts/hermes_ops/github.py` (`cursor_wake_bodies`, no fallback), `scripts/test_hermes_ops.py` (E4 + dsaas 403 + platform 201).
+
 ## D-AUTOMERGE (2026-09-19) — full auto-merge (replaces the human-merge gate)
 
 **Decision:** `main` merge becomes **automatic** for ready, non-draft PRs that pass required checks. This **replaces** the previous "human merge only" gate (old `AGENTS.md` §1.15, `ARCHITECTURE.md` decision #3, `CONTRIBUTING.md`, `docs/LOOP.md`, `docs/LINEAR.md`, `rules/10-git-flow`).

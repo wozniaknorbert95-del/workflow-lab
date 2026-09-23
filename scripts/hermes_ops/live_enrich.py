@@ -72,7 +72,7 @@ def enrich_live(
     issue = issue or {}
     lock = lock or {}
     issue_id = str(issue.get("id") or lock.get("issue_id") or "")
-    # Prefer lock.repo — ensure_cursor may have fallen back to workflow-lab.
+    # Prefer lock.repo (equals Linear target; D-NO-DSAAS-FALLBACK).
     repo = str(lock.get("repo") or issue.get("repo") or "workflow-lab")
     # Real PR only (lock.pr); never treat tracking github_issue as a PR.
     pr = int(issue.get("github_number") or lock.get("pr") or 0)
