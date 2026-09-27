@@ -110,6 +110,33 @@ def today_stats(path: Path | None = None, day: str | None = None) -> dict[str, A
     }
 
 
+def recent_events(path: Path | None = None, limit: int = 8) -> list[dict[str, Any]]:
+    """Ostatnie N zdarzeń z ledgera (redacted) — DZIENNIK w /ops. Najnowsze najpierw."""
+    target = path or LEDGER
+    out: list[dict[str, Any]] = []
+    if not target.is_file():
+        return out
+    for raw in target.read_text(encoding="utf-8").splitlines():
+        if not raw.strip() or not raw.startswith("{"):
+            continue
+        try:
+            row = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        out.append(
+            {
+                "at": str(row.get("at") or ""),
+                "kind": str(row.get("kind") or row.get("result") or ""),
+                "issue": str(row.get("issue") or ""),
+                "pr": row.get("pr"),
+                "repo": str(row.get("repo") or ""),
+                "result": str(row.get("result") or ""),
+                "retries": row.get("retries"),
+            }
+        )
+    return out[-limit:][::-1]
+
+
 def over_daily_cap(path: Path | None = None) -> bool:
     return int(today_stats(path).get("runs") or 0) >= OPS_MAX_RUNS_PER_DAY
 

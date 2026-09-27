@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from .telemetry import today_stats
+from .telemetry import recent_events, today_stats
 
 STATUS_PATH = Path(os.environ.get("HERMES_OPS_STATUS", "data/ops-status.json"))
 
@@ -48,6 +48,7 @@ def build_status(
         "today": today,
         "run_all_enabled": bool(run_all),
         "reason": reason,
+        "ledger": recent_events(ledger),
         "updated_at": updated_at or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
 
