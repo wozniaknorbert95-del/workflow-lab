@@ -422,9 +422,13 @@ def main() -> int:
                 errors.append(f"platform {label} missing no-retarget")
             if "NEVER draft" not in blob:
                 errors.append(f"platform {label} missing NEVER draft")
+            if "/autopilot" not in blob:
+                errors.append(f"platform {label} missing /autopilot")
         lab_issue, lab_comment = cursor_wake_bodies("workflow-lab", {"id": "QUI-ZZ"})
         if "session-preflight" in lab_issue or "session-preflight" in lab_comment:
             errors.append("lab wake must not instruct dsaas preflight")
+        if "/autopilot" in lab_issue or "/autopilot" in lab_comment:
+            errors.append("lab wake must not instruct /autopilot")
 
         bare = {"id": "QUI-ZZ", "title": "no gh yet", "repo": "workflow-lab", "labels": ["agent"]}
         engine_e4 = Engine(

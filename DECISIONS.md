@@ -8,6 +8,8 @@ One page. Newest first. Every irreversible choice lives here.
 
 **Wake text:** `@cursor` issue/comment for platform tickets bootstraps `.cursor/README.md` + `python scripts/session-preflight.py <id>` (UNKNOWN ≠ PASS, no deploy/SSH/secrets, never-draft PR). Lab tickets keep the lab gym prompt and must not instruct dsaas preflight.
 
+**Wake text (2026-09-27):** platform bootstrap adds unattended `/autopilot <id>` (max 3 atoms; gate FAIL → 1 retry; 2× BLOCKED → `/park`), `/scope-lock` → `/scope-look`, `/env` on host change, `/resume` on Pause/Take-over, and an anti-list (never instruct `/deploy` `/publish` `/skip-gate` `/force-merge`; laptop HITL = `/deployready` + Commander GO). Fallback repo logic unchanged.
+
 **Why:** Silent fallback made akademia `/ops` look RUNNING while Cloud worked in the wrong clone. Platform 403 means PAT/issues permission on `dsaas-platform-main`, not “open a lab issue instead”.
 
 **Evidence:** `scripts/hermes_ops/github.py` (`cursor_wake_bodies`, no fallback), `scripts/test_hermes_ops.py` (E4 + dsaas 403 + platform 201).

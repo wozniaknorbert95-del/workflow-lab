@@ -36,6 +36,9 @@ def cursor_wake_bodies(repo: str, issue: dict[str, Any]) -> tuple[str, str]:
             "5. Never: deploy, SSH, secrets, workflow_dispatch, production GO.\n"
             "6. Stay in this repo. Do not retarget workflow-lab.\n"
             f"7. {NEVER_DRAFT_LINE}\n"
+            "8. Unattended procedure: `/autopilot <id>` (max 3 atoms; gate FAIL → 1 retry; 2× BLOCKED → `/park`).\n"
+            "9. Before code: `/scope-lock` then `/scope-look`. Host change → `/env`. Pause/Take over → `/resume` (read `.cursor/context-state.md`).\n"
+            "10. Do not invent `/deploy`, `/publish`, `/skip-gate`, `/force-merge`. Laptop HITL: `/deployready` then wait for Commander GO.\n"
         )
     else:
         bootstrap = (
