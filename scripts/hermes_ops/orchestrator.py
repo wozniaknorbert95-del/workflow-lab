@@ -476,7 +476,9 @@ class Engine:
             next_issue = lanes[LANE_AUTOPILOT][0]
         approval = build_approval(lanes, self.live)
         lanes = attach_lane_progress(lanes, self.live)
-        agents = active_agents_from(self.live, self._lock(), self.worker)
+        agents = active_agents_from(
+            self.live, self._lock(), self.worker, engine=self.engine_state
+        )
         payload = build_status(
             mode=self.mode,
             engine=engine,
