@@ -162,6 +162,12 @@ def main() -> int:
             errors.append(f"progress total=6, jest {engine.live.get('progress')}")
         if engine.live and "api.github.com" in json.dumps(engine.live):
             errors.append("live nie może zawierać api.github.com")
+        if first.get("ok") and (first.get("github") or first.get("cursor")):
+            errors.append("run_next must not return github/@cursor wake")
+        if any("comments" in str(c[1]) for c in calls):
+            errors.append("run_next must not POST GitHub comments")
+        if first.get("ok") and (engine.live or {}).get("action") != "conduct":
+            errors.append(f"live.action expect conduct, got {(engine.live or {}).get('action')}")
 
         second = engine.run_next(issues[1])
         if second.get("code") != 409:
@@ -429,6 +435,12 @@ def main() -> int:
             errors.append("refuse_reason target_repo_create_forbidden mapping")
         if refuse_reason_from_result({"ok": False, "code": 401, "error": "missing_GITHUB_OPS_COMMENT"}) != "missing_GITHUB_OPS_COMMENT":
             errors.append("refuse_reason missing_GITHUB_OPS_COMMENT mapping")
+        if refuse_reason_from_result({"ok": False, "error": "missing_CURSOR_API_KEY"}) != "missing_CURSOR_API_KEY":
+            errors.append("refuse_reason missing_CURSOR_API_KEY mapping")
+        if refuse_reason_from_result({"ok": False, "error": "cursor_api_busy"}) != "cursor_api_busy":
+            errors.append("refuse_reason cursor_api_busy mapping")
+        if refuse_reason_from_result({"ok": False, "error": "conductor_timeout"}) != "conductor_timeout":
+            errors.append("refuse_reason conductor_timeout mapping")
 
         from hermes_ops.github import cursor_wake_bodies
 
@@ -464,31 +476,145 @@ def main() -> int:
             state_path=tmp_path / "state-e4.json",
             github_read_token="",
         )
-        trig = engine_e4.run_next(bare, fixture=phone)
+        calls_before_e4 = len(calls)
+        trig = engine_e4.run_next(bare)
         if not trig.get("ok"):
-            errors.append(f"E4 ensure_cursor without github_number: {trig}")
+            errors.append(f"conductor run_next without github_number: {trig}")
         else:
-            created_calls = [c for c in calls if c[0] == "POST" and str(c[1]).rstrip("/").endswith("/issues")]
-            comment_calls = [c for c in calls if "comments" in str(c[1])]
-            if not created_calls:
-                errors.append("E4 expect create issue when github_number missing")
-            if not any("@cursor" in json.dumps(c[2] or {}) for c in comment_calls):
-                errors.append("E4 @cursor comment body missing")
-            if not any("NEVER draft" in json.dumps(c[2] or {}) for c in created_calls):
-                errors.append("E4 issue body must forbid draft PRs (D-AUTOMERGE)")
-            if not any("NEVER draft" in json.dumps(c[2] or {}) for c in comment_calls):
-                errors.append("E4 @cursor comment must forbid draft PRs (D-AUTOMERGE)")
-            if any("session-preflight" in json.dumps(c[2] or {}) for c in created_calls + comment_calls):
-                errors.append("E4 lab wake must not instruct dsaas preflight")
+            new_calls = calls[calls_before_e4:]
+            if any(c[0] == "POST" for c in new_calls):
+                errors.append(f"run_next must not POST GitHub, got {new_calls}")
+            if trig.get("github") or trig.get("cursor"):
+                errors.append("run_next must not return github/@cursor payload")
+            if not trig.get("conductor"):
+                errors.append("run_next must flag conductor handoff")
             lock_e4 = json.loads((tmp_path / "lock-e4.json").read_text(encoding="utf-8"))
-            if int(lock_e4.get("github_issue") or 0) != 501 or lock_e4.get("pr"):
-                errors.append(f"E4 lock tracking≠PR: {lock_e4}")
-            if lock_e4.get("wake_state") not in ("commented", "already"):
-                errors.append(f"E4 lock wake_state: {lock_e4.get('wake_state')}")
+            if lock_e4.get("cursor_triggered"):
+                errors.append(f"lock must not claim cursor_triggered: {lock_e4}")
+            if lock_e4.get("wake_state") != "conductor":
+                errors.append(f"lock wake_state expect conductor, got {lock_e4.get('wake_state')}")
+            if lock_e4.get("pr"):
+                errors.append(f"no github_number must not invent lock.pr: {lock_e4}")
             if engine_e4.engine_state != "RUNNING":
-                errors.append(f"E4 comment 201 must be RUNNING, got {engine_e4.engine_state}")
-            # fixture path may still show a demo PR — real no-PR path covered by fallback test below.
-        # Fail-closed: dsaas create 403 is target_repo_create_forbidden, never a lab issue.
+                errors.append(f"conductor handoff must occupy RUNNING slot, got {engine_e4.engine_state}")
+            live_e4 = engine_e4.live or {}
+            if live_e4.get("action") != "conduct":
+                errors.append(f"live.action expect conduct, got {live_e4.get('action')}")
+            if (live_e4.get("agent") or {}).get("run_url"):
+                errors.append("without Nous file must not invent run_url")
+            handoff_e4 = tmp_path / "hermes-conductor-handoff.json"
+            if not handoff_e4.is_file():
+                errors.append("run_next must write conductor handoff JSON")
+            else:
+                ho = json.loads(handoff_e4.read_text(encoding="utf-8"))
+                if ho.get("issue_id") != "QUI-ZZ" or ho.get("work_mode") != "buduj":
+                    errors.append(f"handoff payload: {ho}")
+
+        engine_url = Engine(
+            github=gh,
+            mode="MANUAL",
+            lock_path=tmp_path / "lock-url.json",
+            ledger=tmp_path / "ledger-url.jsonl",
+            state_path=tmp_path / "state-url.json",
+            github_read_token="",
+        )
+        cond_ok = {
+            "issue": "QUI-ZZ",
+            "agent": {"run_url": "https://cursor.com/agents/abc", "run_id": "abc"},
+            "tests": [{"cmd": "pytest", "excerpt": "1 passed", "verdict": "PASS"}],
+            "conductor": {"role": "nous", "mode": "buduj", "report_pl": "sesja idzie"},
+        }
+        out_url = engine_url.run_next(bare, conductor=cond_ok)
+        if not out_url.get("ok"):
+            errors.append(f"conductor with https run_url expect ok, got {out_url}")
+        live_url = engine_url.live or {}
+        if (live_url.get("agent") or {}).get("run_url") != "https://cursor.com/agents/abc":
+            errors.append(f"must copy https run_url, got {live_url.get('agent')}")
+        tests_url = live_url.get("tests") or []
+        if not tests_url or tests_url[0].get("verdict") != "PASS":
+            errors.append(f"must copy live.tests, got {tests_url}")
+        s2 = next((s for s in (live_url.get("steps") or []) if s.get("step") == 2), {})
+        if str(s2.get("status") or "").upper() != "PASS":
+            errors.append(f"S2 must PASS with https run_url, got {s2}")
+
+        engine_http = Engine(
+            github=gh,
+            mode="MANUAL",
+            lock_path=tmp_path / "lock-http.json",
+            ledger=tmp_path / "ledger-http.jsonl",
+            state_path=tmp_path / "state-http.json",
+            github_read_token="",
+        )
+        engine_http.run_next(
+            bare,
+            conductor={"issue": "QUI-ZZ", "agent": {"run_url": "http://cursor.com/agents/abc"}},
+        )
+        if (engine_http.live or {}).get("agent", {}).get("run_url"):
+            errors.append("http run_url must be stripped")
+
+        engine_ref = Engine(
+            github=gh,
+            mode="MANUAL",
+            lock_path=tmp_path / "lock-ref.json",
+            ledger=tmp_path / "ledger-ref.jsonl",
+            state_path=tmp_path / "state-ref.json",
+            github_read_token="",
+        )
+        out_ref = engine_ref.run_next(
+            bare,
+            conductor={"issue": "QUI-ZZ", "refuse": "missing_CURSOR_API_KEY"},
+        )
+        if out_ref.get("ok") or str(out_ref.get("error") or "") != "missing_CURSOR_API_KEY":
+            errors.append(f"Nous refuse must surface missing_CURSOR_API_KEY, got {out_ref}")
+        if engine_ref.engine_state == "RUNNING":
+            errors.append("Nous refuse must not occupy RUNNING")
+
+        import time as time_ttl
+
+        engine_to = Engine(
+            github=gh,
+            mode="MANUAL",
+            lock_path=tmp_path / "lock-ttl.json",
+            ledger=tmp_path / "ledger-ttl.jsonl",
+            state_path=tmp_path / "state-ttl.json",
+            github_read_token="",
+        )
+        engine_to.engine_state = "RUNNING"
+        engine_to.live = {"issue": "QUI-TO", "agent": {"run_url": ""}}
+        engine_to._write_lock(
+            {"issue_id": "QUI-TO", "started": time_ttl.time() - 50, "repo": "workflow-lab"}
+        )
+        os.environ["OPS_CONDUCTOR_TTL_SEC"] = "10"
+        try:
+            to_res = engine_to.apply_conductor({})
+        finally:
+            os.environ.pop("OPS_CONDUCTOR_TTL_SEC", None)
+        if str(to_res.get("error") or "") != "conductor_timeout":
+            errors.append(f"RUNNING without URL past TTL expect conductor_timeout, got {to_res}")
+
+        orch_src = (ROOT / "scripts" / "hermes_ops" / "orchestrator.py").read_text(encoding="utf-8")
+        tick_src = (ROOT / "scripts" / "hermes-ops-tick.py").read_text(encoding="utf-8")
+        adapter_src = (ROOT / "scripts" / "hermes_ops" / "conductor_adapter.py").read_text(encoding="utf-8")
+        if "ensure_cursor_trigger" in orch_src:
+            errors.append("orchestrator must not call ensure_cursor_trigger")
+        for label, src in (("tick", tick_src), ("adapter", adapter_src), ("orchestrator", orch_src)):
+            if "api.cursor.com" in src:
+                errors.append(f"{label} must not call Cursor HTTP API")
+
+        # Legacy GitHubOps.ensure_cursor_trigger stays for merge-era tools, not S2.
+        snap = len(calls)
+        trig_gh = gh.ensure_cursor_trigger("workflow-lab", bare)
+        if not trig_gh.get("ok"):
+            errors.append(f"legacy ensure_cursor_trigger: {trig_gh}")
+        created_calls = [
+            c for c in calls[snap:] if c[0] == "POST" and str(c[1]).rstrip("/").endswith("/issues")
+        ]
+        comment_calls = [c for c in calls[snap:] if "comments" in str(c[1])]
+        if not created_calls:
+            errors.append("legacy create issue when github_number missing")
+        if not any("@cursor" in json.dumps(c[2] or {}) for c in comment_calls):
+            errors.append("legacy @cursor comment body missing")
+
         calls_fb: list[tuple] = []
 
         def fetch_fallback(method, path, payload):
@@ -509,14 +635,6 @@ def main() -> int:
             return {"ok": True, "code": 200, "body": {}}
 
         gh_fb = GitHubOps(token="test", fetch=fetch_fallback)
-        engine_fb = Engine(
-            github=gh_fb,
-            mode="MANUAL",
-            lock_path=tmp_path / "lock-fb.json",
-            ledger=tmp_path / "ledger-fb.jsonl",
-            state_path=tmp_path / "state-fb.json",
-            github_read_token="tok",
-        )
         dsaas_bare = {
             "id": "QUI-89",
             "title": "discover",
@@ -524,7 +642,7 @@ def main() -> int:
             "labels": ["agent"],
             "github_number": 0,
         }
-        out_fb = engine_fb.run_next(dsaas_bare)
+        out_fb = gh_fb.ensure_cursor_trigger("dsaas-platform-main", dsaas_bare)
         if out_fb.get("ok"):
             errors.append(f"dsaas create 403 must REFUSE, got ok: {out_fb}")
         if str(out_fb.get("error") or "") != "target_repo_create_forbidden":
@@ -534,142 +652,34 @@ def main() -> int:
         ]
         if lab_posts_fb:
             errors.append(f"dsaas 403 must not fallback to lab: {lab_posts_fb}")
-        if engine_fb.engine_state == "RUNNING":
-            errors.append("dsaas create 403 must not set RUNNING")
-        if (tmp_path / "lock-fb.json").exists():
-            errors.append("dsaas create 403 must clear lock")
 
-        # Comment 403 after a successful lab create is still REFUSED, never fake RUNNING.
-        calls_c403: list[tuple] = []
-
-        def fetch_c403(method, path, payload):
-            calls_c403.append((method, path, payload))
-            if method == "GET" and "comments" in path:
-                return {"ok": True, "code": 200, "body": []}
-            if method == "POST" and path.rstrip("/").endswith("/issues") and "/comments" not in path:
-                return {
-                    "ok": True,
-                    "code": 201,
-                    "body": {
-                        "number": 77,
-                        "html_url": "https://github.com/wozniaknorbert95-del/workflow-lab/issues/77",
-                    },
-                }
-            if "comments" in path:
-                return {"ok": False, "code": 403, "error": "http_403"}
-            return {"ok": True, "code": 200, "body": {}}
-
-        gh_c403 = GitHubOps(token="test", fetch=fetch_c403)
-        engine_c403 = Engine(
-            github=gh_c403,
+        engine_plat = Engine(
+            github=gh_fb,
             mode="MANUAL",
-            lock_path=tmp_path / "lock-c403.json",
-            ledger=tmp_path / "ledger-c403.jsonl",
-            state_path=tmp_path / "state-c403.json",
+            lock_path=tmp_path / "lock-plat.json",
+            ledger=tmp_path / "ledger-plat.jsonl",
+            state_path=tmp_path / "state-plat.json",
             github_read_token="",
         )
-        out_c403 = engine_c403.run_next(
-            {
-                "id": "QUI-ZZ2",
-                "title": "lab wake",
-                "repo": "workflow-lab",
-                "labels": ["agent"],
-                "github_number": 0,
-            }
-        )
-        if out_c403.get("ok"):
-            errors.append(f"comment 403 must REFUSE, got ok: {out_c403}")
-        if str(out_c403.get("error") or "") != "cursor_wake_forbidden":
-            errors.append(f"comment 403 error expect cursor_wake_forbidden, got {out_c403}")
-        if engine_c403.engine_state == "RUNNING":
-            errors.append("comment 403 must not set RUNNING")
-        if (tmp_path / "lock-c403.json").exists():
-            errors.append("comment 403 must clear lock")
+        out_plat = engine_plat.run_next(dsaas_bare)
+        if not out_plat.get("ok"):
+            errors.append(f"platform conductor handoff expect ok, got {out_plat}")
+        live_plat = engine_plat.live or {}
+        if live_plat.get("repo") != "dsaas-platform-main":
+            errors.append(f"platform live.repo expect dsaas-platform-main, got {live_plat.get('repo')}")
+        if live_plat.get("pr_url") or live_plat.get("pr_number"):
+            errors.append(f"platform handoff must not invent PR: {live_plat.get('pr_url')}")
+        if live_plat.get("cursor_comment_url"):
+            errors.append(f"platform handoff must not set cursor_comment_url: {live_plat.get('cursor_comment_url')}")
+        if engine_plat.engine_state != "RUNNING":
+            errors.append(f"platform handoff engine_state: {engine_plat.engine_state}")
+        retry_same = engine_plat.run_next(dsaas_bare)
+        if retry_same.get("code") != 409:
+            errors.append(f"idempotent retry expect 409, got {retry_same}")
 
-        # Platform create 201 + comment 201 stays on dsaas-platform-main (no lab retarget).
-        calls_ok: list[tuple] = []
-
-        def fetch_ok(method, path, payload):
-            calls_ok.append((method, path, payload))
-            if method == "GET" and "comments" in path:
-                return {"ok": True, "code": 200, "body": []}
-            if method == "POST" and "/dsaas-platform-main/issues" in path and "/comments" not in path:
-                return {
-                    "ok": True,
-                    "code": 201,
-                    "body": {
-                        "number": 88,
-                        "html_url": "https://github.com/wozniaknorbert95-del/dsaas-platform-main/issues/88",
-                    },
-                }
-            if method == "POST" and path.rstrip("/").endswith("/issues") and "/comments" not in path:
-                return {
-                    "ok": True,
-                    "code": 201,
-                    "body": {
-                        "number": 77,
-                        "html_url": "https://github.com/wozniaknorbert95-del/workflow-lab/issues/77",
-                    },
-                }
-            if method == "POST" and "comments" in path:
-                if "dsaas-platform-main" in path:
-                    curl = "https://github.com/wozniaknorbert95-del/dsaas-platform-main/issues/88#issuecomment-9"
-                else:
-                    curl = "https://github.com/wozniaknorbert95-del/workflow-lab/issues/77#issuecomment-9"
-                return {"ok": True, "code": 201, "body": {"html_url": curl}}
-            return {"ok": True, "code": 200, "body": {}}
-
-        gh_ok = GitHubOps(token="test", fetch=fetch_ok)
-        engine_ok = Engine(
-            github=gh_ok,
-            mode="MANUAL",
-            lock_path=tmp_path / "lock-ok.json",
-            ledger=tmp_path / "ledger-ok.jsonl",
-            state_path=tmp_path / "state-ok.json",
-            github_read_token="",
-        )
-        out_ok = engine_ok.run_next(dsaas_bare)
-        if not out_ok.get("ok"):
-            errors.append(f"dsaas comment 201 expect RUNNING ok, got {out_ok}")
-        else:
-            live_ok = engine_ok.live or {}
-            if live_ok.get("repo") != "dsaas-platform-main":
-                errors.append(f"platform wake repo expect dsaas-platform-main, got {live_ok.get('repo')}")
-            if live_ok.get("pr_url") or live_ok.get("pr_number"):
-                errors.append(f"platform wake must not invent PR: {live_ok.get('pr_url')}")
-            if int(live_ok.get("github_issue") or 0) != 88:
-                errors.append(f"platform github_issue: {live_ok.get('github_issue')}")
-            if live_ok.get("cursor_comment_url") != "https://github.com/wozniaknorbert95-del/dsaas-platform-main/issues/88#issuecomment-9":
-                errors.append(f"platform comment_url: {live_ok.get('cursor_comment_url')}")
-            if live_ok.get("wake_state") != "commented":
-                errors.append(f"platform wake_state: {live_ok.get('wake_state')}")
-            lab_creates_ok = [
-                c
-                for c in calls_ok
-                if c[0] == "POST" and "/workflow-lab/issues" in str(c[1]) and "/comments" not in str(c[1])
-            ]
-            if lab_creates_ok:
-                errors.append(f"platform wake must not create lab issue: {lab_creates_ok}")
-            if "workflow-lab/pull" in json.dumps(live_ok) or "workflow-lab/issues" in json.dumps(live_ok):
-                errors.append("platform wake must never point at lab tracking issue")
-            lock_ok = json.loads((tmp_path / "lock-ok.json").read_text(encoding="utf-8"))
-            if lock_ok.get("repo") != "dsaas-platform-main" or lock_ok.get("pr"):
-                errors.append(f"platform lock: {lock_ok}")
-            if engine_ok.engine_state != "RUNNING":
-                errors.append(f"dsaas comment 201 engine_state: {engine_ok.engine_state}")
-            comment_posts = [c for c in calls_ok if c[0] == "POST" and "comments" in str(c[1])]
-            if not any("session-preflight.py QUI-89" in json.dumps(c[2] or {}) for c in comment_posts):
-                errors.append("platform @cursor comment must bootstrap session-preflight")
-            retry_same = engine_ok.run_next(dsaas_bare)
-            if retry_same.get("code") != 409:
-                errors.append(f"idempotent retry expect 409, got {retry_same}")
-            comment_posts_after = [c for c in calls_ok if c[0] == "POST" and "comments" in str(c[1])]
-            if len(comment_posts_after) != len(comment_posts):
-                errors.append("idempotent retry must not POST a second @cursor comment")
-
-        paused = engine_ok.pause()
-        if paused.get("engine") != "PAUSED" or (tmp_path / "lock-ok.json").exists():
-            errors.append(f"pause must clear lock: {paused} exists={ (tmp_path / 'lock-ok.json').exists() }")
+        paused = engine_plat.pause()
+        if paused.get("engine") != "PAUSED" or (tmp_path / "lock-plat.json").exists():
+            errors.append(f"pause must clear lock: {paused} exists={(tmp_path / 'lock-plat.json').exists()}")
         other = {
             "id": "QUI-90",
             "title": "next",
@@ -677,7 +687,7 @@ def main() -> int:
             "labels": ["agent"],
             "github_number": 0,
         }
-        after_pause = engine_ok.run_next(other)
+        after_pause = engine_plat.run_next(other)
         if not after_pause.get("ok"):
             errors.append(f"pause then start new issue must not refuse_lock: {after_pause}")
         if str(after_pause.get("error") or "") in ("idempotent", "concurrent"):

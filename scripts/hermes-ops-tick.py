@@ -125,7 +125,12 @@ def main() -> int:
         match = engine.pick_next(issues, wanted)
         if match:
             if engine.mode == "MANUAL" or cmd.get("action") in ("run_next", "retry", "start"):
-                last_result = engine.run_next(match, fixture=phone_fx)
+                last_result = engine.run_next(
+                    match,
+                    fixture=phone_fx,
+                    work_mode=str(cmd.get("work_mode") or "buduj"),
+                    cmd_id=str(cmd.get("id") or ""),
+                )
                 reason = str(last_result.get("error") or "run_next")
                 if not last_result.get("ok"):
                     _refuse_from(last_result)
@@ -143,6 +148,12 @@ def main() -> int:
 
     if engine.busy() or engine.live:
         engine.refresh_live(issues, fixture=phone_fx)
+
+    applied = engine.apply_conductor()
+    if not applied.get("ok"):
+        _refuse_from(applied)
+        engine.pause()
+        reason = str(applied.get("error") or reason)
 
     payload = engine.status_payload(issues)
     payload["reason"] = reason

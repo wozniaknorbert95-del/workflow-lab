@@ -107,13 +107,11 @@ def enrich_live(
                 "reason": type(exc).__name__,
             }
     else:
-        # Offline / tracking issue only — S2 after a real @cursor comment (2xx).
-        wake_state = str((cursor_meta or {}).get("wake_state") or lock.get("wake_state") or "")
-        commented = bool((cursor_meta or {}).get("commented") is True) or wake_state in (
-            "commented",
-            "already",
-        )
-        cursor_ok = commented and bool(github_issue or (cursor_meta or {}).get("issue_number"))
+        # Offline / tracking issue only — S2 PASS only with https Cloud run_url.
+        run_url_hint = str(
+            (cursor_meta or {}).get("run_url") or lock.get("run_url") or ""
+        ).strip()
+        cloud_ok = run_url_hint.lower().startswith("https://")
         evaluated = {
             "step": 2 if issue_id else 0,
             "status": "UNKNOWN" if not issue_id else "PASS",
@@ -121,9 +119,15 @@ def enrich_live(
                 {"step": 1, "status": "PASS" if issue_id else "UNKNOWN", "evidence": [{"kind": "linear_issue", "id": issue_id}], "reason": ""},
                 {
                     "step": 2,
-                    "status": "PASS" if cursor_ok else "UNKNOWN",
-                    "evidence": [{"kind": "cursor_trigger", "github_issue": github_issue or None, "repo": repo}],
-                    "reason": "",
+                    "status": "PASS" if cloud_ok else "UNKNOWN",
+                    "evidence": [
+                        {
+                            "kind": "cursor_cloud_api",
+                            "run_url": run_url_hint if cloud_ok else None,
+                            "repo": repo,
+                        }
+                    ],
+                    "reason": "" if cloud_ok else "waiting conductor run_url",
                 },
                 {"step": 3, "status": "UNKNOWN", "evidence": [], "reason": "no PR yet"},
                 {"step": 4, "status": "UNKNOWN", "evidence": [], "reason": "checks not available"},
@@ -199,7 +203,7 @@ def enrich_live(
         "title": issue.get("title") or lock.get("title") or "",
         "repo": repo,
         "worker": worker,
-        "action": "@cursor" if worker == "cursor" else worker,
+        "action": "conduct" if worker == "cursor" else worker,
         "step": evaluated.get("step"),
         "status": evaluated.get("status") or "UNKNOWN",
         "steps": steps,
