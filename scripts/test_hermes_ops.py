@@ -215,6 +215,17 @@ def main() -> int:
             errors.append(
                 f"stale lock must not append run_next (before={run_next_before} after={run_next_after})"
             )
+        engine.live = {
+            "issue": "QUI-88",
+            "step": 2,
+            "status": "RUNNING",
+            "title": "ghost",
+        }
+        ghost = engine.status_payload(issues).get("active_agents") or []
+        if ghost:
+            errors.append(
+                f"ghost live after stale TTL must not occupy active_agents, got {ghost}"
+            )
 
         append_event(
             {
@@ -356,6 +367,20 @@ def main() -> int:
         agents = active_agents_from(take.live, take._lock(), "cursor")
         if not agents or agents[0].get("id") != "QUI-201":
             errors.append(f"active_agents_from: {agents}")
+        paused_ghost = active_agents_from(
+            take.live, {}, "cursor", engine="PAUSED"
+        )
+        if paused_ghost:
+            errors.append(
+                f"PAUSED ghost live must not occupy slot, got {paused_ghost}"
+            )
+        no_lock_running = active_agents_from(
+            take.live, {}, "cursor", engine="RUNNING"
+        )
+        if no_lock_running:
+            errors.append(
+                f"RUNNING without lock must not occupy slot, got {no_lock_running}"
+            )
 
         mode_ok = take.set_mode("SUPERVISED")
         if not mode_ok.get("ok") or take.mode != "SUPERVISED":

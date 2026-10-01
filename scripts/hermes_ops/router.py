@@ -75,23 +75,36 @@ def active_agents_from(
     live: dict[str, Any] | None,
     lock: dict[str, Any] | None,
     worker: str = "cursor",
+    *,
+    engine: str = "",
 ) -> list[dict[str, Any]]:
-    """WIP strip: currently running Cursor (max 1 by policy)."""
+    """WIP strip: currently running Cursor (max 1 by policy).
+
+    Ghost ``live.issue`` after PAUSED / TTL / S6 must not occupy the slot.
+    Occupied only with a lock (and RUNNING when engine is passed).
+    """
     agents: list[dict[str, Any]] = []
-    issue_id = str((live or {}).get("issue") or (lock or {}).get("issue_id") or "")
-    if not issue_id:
+    engine_u = str(engine or "").upper()
+    if engine_u in ("PAUSED", "STOPPED"):
         return agents
-    if (live or {}).get("action") == "take_over":
+    live = live if isinstance(live, dict) else {}
+    lock = lock if isinstance(lock, dict) else {}
+    if live.get("action") == "take_over":
+        return agents
+    lock_id = str(lock.get("issue_id") or "").strip()
+    if not lock_id:
+        return agents
+    if engine_u and engine_u != "RUNNING":
         return agents
     agents.append(
         {
-            "id": issue_id,
-            "title": (live or {}).get("title") or "",
-            "worker": (live or {}).get("worker") or worker,
-            "step": (live or {}).get("step"),
-            "status": (live or {}).get("status") or "RUNNING",
-            "progress": (live or {}).get("progress"),
-            "repo": (live or {}).get("repo") or (lock or {}).get("repo") or "",
+            "id": lock_id,
+            "title": live.get("title") or "",
+            "worker": live.get("worker") or worker,
+            "step": live.get("step"),
+            "status": live.get("status") or "RUNNING",
+            "progress": live.get("progress"),
+            "repo": live.get("repo") or lock.get("repo") or "",
         }
     )
     return agents
