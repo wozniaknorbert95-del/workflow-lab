@@ -11,6 +11,8 @@ Environment=HERMES_OPS_LOCK=/opt/workflow-lab/data/hermes-ops-lock.json
 Environment=HERMES_OPS_LEDGER=/opt/workflow-lab/data/hermes-ops-ledger.jsonl
 Environment=LINEAR_OPS_QUEUE_FILE=/opt/workflow-lab/data/linear-queue.json
 Environment=ACADEMY_DATA_DIR=/opt/akademia/data
+Environment=HERMES_CONDUCTOR_STATUS=/opt/akademia/data/hermes-conductor-live.json
+Environment=HERMES_CONDUCTOR_HANDOFF=/opt/akademia/data/hermes-conductor-handoff.json
 Environment=AKADEMIA_PUSH_SEND=/opt/akademia/scripts/push-send.py
 WorkingDirectory=/opt/workflow-lab
 ExecStartPre=/usr/bin/bash -c 'p=/opt/akademia/data/ops-cmd.json; if [ -d "$p" ]; then rmdir "$p" || true; fi'

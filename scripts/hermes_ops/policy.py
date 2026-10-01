@@ -34,7 +34,7 @@ def allow_merge(repo: str, checks_green: bool, issue: dict[str, Any] | None = No
 
 
 def allow_cursor_comment(issue: dict[str, Any], mode: str = "AUTOPILOT") -> tuple[bool, int, str]:
-    """hitl never gets @cursor. MANUAL Run next still requires agent label."""
+    """HITL never gets a Cloud session. MANUAL Run next still requires agent label."""
     labels = _labels(issue)
     if "hitl:approval-required" in labels:
         return False, 403, LOCAL_ONLY

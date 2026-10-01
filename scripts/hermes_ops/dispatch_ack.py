@@ -75,6 +75,9 @@ def refuse_reason_from_result(result: dict[str, Any] | None) -> str | None:
         "empty_queue": "empty_queue",
         "repo_not_in_policy": "repo_not_in_policy",
         "target_repo_create_forbidden": "target_repo_create_forbidden",
+        "missing_CURSOR_API_KEY": "missing_CURSOR_API_KEY",
+        "cursor_api_busy": "cursor_api_busy",
+        "conductor_timeout": "conductor_timeout",
     }
     for key, reason in mapping.items():
         if key in err:

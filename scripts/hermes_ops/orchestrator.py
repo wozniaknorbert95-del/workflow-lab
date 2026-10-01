@@ -1,4 +1,4 @@
-"""S0 Linear → S2 @cursor → S3 PR → S4 checks → S6 merge. No S-deploy."""
+"""S0 Linear → S2 conductor handoff → S3 PR → S4 checks → S6 merge. No S-deploy."""
 from __future__ import annotations
 
 import json
@@ -8,6 +8,14 @@ from pathlib import Path
 from typing import Any
 
 from . import policy
+from .conductor_adapter import (
+    load_conductor_status,
+    merge_conductor_into_live,
+    refuse_of,
+    sanitize_work_mode,
+    timeout_reason,
+    write_handoff,
+)
 from .github import GitHubOps
 from .live_enrich import build_approval, enrich_live
 from .router import (
@@ -122,6 +130,15 @@ class Engine:
         tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         tmp.replace(self.state_path)
 
+    def _conductor_paths(self) -> tuple[Path, Path]:
+        root = self.lock_path.parent
+        status = os.environ.get("HERMES_CONDUCTOR_STATUS")
+        handoff = os.environ.get("HERMES_CONDUCTOR_HANDOFF")
+        return (
+            Path(status) if status else root / "hermes-conductor-live.json",
+            Path(handoff) if handoff else root / "hermes-conductor-handoff.json",
+        )
+
     def pick_next(self, issues: list[dict[str, Any]], issue_id: str = "") -> dict[str, Any] | None:
         wanted = str(issue_id or "")
         if wanted:
@@ -157,7 +174,7 @@ class Engine:
         return {"ok": True, "engine": self.engine_state}
 
     def take_over(self, issue: dict[str, Any] | None = None) -> dict[str, Any]:
-        """Pause + mark live issue as local (zero @cursor)."""
+        """Pause + mark live issue as local (zero Cloud follow-up)."""
         self.pause()
         issue_id = str((issue or {}).get("id") or (self.live or {}).get("issue") or self._lock().get("issue_id") or "")
         self._clear_lock()
@@ -167,7 +184,7 @@ class Engine:
             "worker": self.worker,
             "status": "PAUSED",
             "step": None,
-            "message": "Take over — zrób na laptopie. Zero @cursor.",
+            "message": "Take over — zrób na laptopie. Zero follow-up do Cursora.",
         }
         append_event(
             {
@@ -194,7 +211,35 @@ class Engine:
         append_event({"kind": "mode", "result": mode, "agent": self.worker}, self.ledger)
         return {"ok": True, "mode": self.mode}
 
-    def run_next(self, issue: dict[str, Any], *, fixture: dict[str, Any] | None = None) -> dict[str, Any]:
+    def apply_conductor(self, blob: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Merge Nous live JSON. Never starts a Cloud session from Python."""
+        issue_id = str((self.live or {}).get("issue") or self._lock().get("issue_id") or "")
+        status_path, _ = self._conductor_paths()
+        src = blob if blob is not None else load_conductor_status(status_path)
+        why = refuse_of(src, issue_id)
+        if why:
+            return {"ok": False, "code": 403, "error": why}
+        if self.live:
+            work_mode = sanitize_work_mode(self._lock().get("work_mode"))
+            self.live = merge_conductor_into_live(self.live, src, work_mode=work_mode)
+        why_to = timeout_reason(
+            engine_state=self.engine_state,
+            lock=self._lock(),
+            live=self.live,
+        )
+        if why_to:
+            return {"ok": False, "code": 504, "error": why_to}
+        return {"ok": True}
+
+    def run_next(
+        self,
+        issue: dict[str, Any],
+        *,
+        fixture: dict[str, Any] | None = None,
+        conductor: dict[str, Any] | None = None,
+        work_mode: str = "buduj",
+        cmd_id: str = "",
+    ) -> dict[str, Any]:
         if policy.allow_deploy("run_next")[0]:
             return {"ok": False, "code": 403, "error": policy.DEPLOY_DENIED}
         if "deploy" in json.dumps(issue).lower():
@@ -216,58 +261,29 @@ class Engine:
         if over_daily_cap(self.ledger):
             return {"ok": False, "code": 429, "error": "daily_cap"}
         issue_id = str(issue.get("id") or "")
+        status_path, handoff_path = self._conductor_paths()
+        blob = conductor if conductor is not None else load_conductor_status(status_path)
+        why = refuse_of(blob, issue_id)
+        if why:
+            return {"ok": False, "code": 403, "error": why}
         started = time.time()
         repo = str(issue.get("repo") or "workflow-lab")
-        # Pending lock only — RUNNING is illegal until @cursor comment is 2xx.
-        self._write_lock(
-            {
-                "issue_id": issue_id,
-                "started": started,
-                "repo": repo,
-                "pr": issue.get("github_number"),
-                "wake_state": "pending",
-            }
-        )
-        # E4: Linear issues usually lack github_number — create/find GH issue + @cursor.
-        trigger = self.github.ensure_cursor_trigger(repo, issue)
-        commented_ok = bool(trigger.get("ok") and trigger.get("commented") is True)
-        number = int(trigger.get("issue_number") or 0)
-        if not commented_ok or number <= 0:
-            self.pause()
-            return {
-                "ok": False,
-                "code": int(trigger.get("code") or 401),
-                "error": str(trigger.get("error") or "cursor_wake_failed"),
-            }
-        # Repo that received @cursor must equal Linear target (no lab fallback).
-        used_repo = str(trigger.get("repo") or repo)
-        # Newly created tracking issues are NOT PRs — do not feed them into PR enrich.
-        created_issue = bool(trigger.get("created"))
-        existing_pr = int(issue.get("github_number") or 0) if not created_issue else 0
+        mode = sanitize_work_mode(work_mode)
+        existing_pr = int(issue.get("github_number") or 0)
         self.engine_state = "RUNNING"
-        # Lock: github_issue = tracking issue; pr = real PR only (0 until agent opens one).
         self._write_lock(
             {
                 "issue_id": issue_id,
                 "title": str(issue.get("title") or "")[:200],
                 "started": started,
-                "repo": used_repo,
+                "repo": repo,
                 "pr": existing_pr or None,
-                "github_issue": number,
-                "cursor_comment_url": trigger.get("comment_url") or "",
-                "wake_state": str(trigger.get("wake_state") or "commented"),
-                "cursor_triggered": True,
+                "wake_state": "conductor",
+                "cursor_triggered": False,
+                "work_mode": mode,
             }
         )
-        commented = {
-            "ok": True,
-            "issue_number": number,
-            "created": trigger.get("created"),
-            "repo": used_repo,
-            "comment_url": trigger.get("comment_url") or "",
-            "wake_state": trigger.get("wake_state"),
-        }
-        enrich_issue = {**issue, "repo": used_repo}
+        enrich_issue = {**issue, "repo": repo}
         if existing_pr > 0:
             enrich_issue["github_number"] = existing_pr
         else:
@@ -279,17 +295,19 @@ class Engine:
             token=self.github_read_token,
             fixture=fixture,
             started=started,
-            cursor_meta=trigger,
+            cursor_meta=None,
         )
+        self.live = merge_conductor_into_live(self.live, blob, work_mode=mode)
+        write_handoff(enrich_issue, work_mode=mode, cmd_id=cmd_id, path=handoff_path)
         append_event(
             {
                 "kind": "run_next",
                 "issue": issue_id,
                 "agent": self.worker,
                 "model": None,
-                "repo": used_repo,
+                "repo": repo,
                 "pr": existing_pr or None,
-                "github_issue": number or None,
+                "github_issue": None,
                 "result": "started",
                 "input_tokens": None,
                 "output_tokens": None,
@@ -301,7 +319,7 @@ class Engine:
             self.ledger,
         )
         self.save_state()
-        return {"ok": True, "queued": issue_id, "github": commented, "cursor": trigger}
+        return {"ok": True, "queued": issue_id, "github": None, "cursor": None, "conductor": True}
 
     def run_all(self, issues: list[dict[str, Any]]) -> dict[str, Any]:
         ok, code, reason = policy.allow_run_all(run_all_enabled())
@@ -430,6 +448,12 @@ class Engine:
             if lock.get("cursor_triggered")
             else None,
         )
+        status_path, _ = self._conductor_paths()
+        self.live = merge_conductor_into_live(
+            self.live,
+            load_conductor_status(status_path),
+            work_mode=sanitize_work_mode(lock.get("work_mode")),
+        )
         self._observe_merge_if_done()
 
     def _observe_merge_if_done(self) -> None:
@@ -492,6 +516,9 @@ class Engine:
             run_all=run_all_enabled(),
             active_agents=agents,
         )
+        live = self.live if isinstance(self.live, dict) else {}
+        cond = live.get("conductor") if isinstance(live.get("conductor"), dict) else {}
+        payload["work_mode"] = sanitize_work_mode(cond.get("mode") or self._lock().get("work_mode"))
         # Waiting = HITL/local queue size (operator signal), not only ledger.
         today = dict(payload.get("today") or {})
         today["waiting"] = max(int(today.get("waiting") or 0), len(lanes.get(LANE_LOCAL) or []))

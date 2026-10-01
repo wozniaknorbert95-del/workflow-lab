@@ -32,6 +32,10 @@ OPS_MODE=MANUAL
 OPS_MAX_CONCURRENT=1
 OPS_MAX_RUNS_PER_DAY=8
 OPS_RUN_ALL=0
+# Nous writes this; tick only copies into ops-status.json (never starts Cloud).
+# HERMES_CONDUCTOR_STATUS=/opt/akademia/data/hermes-conductor-live.json
+# HERMES_CONDUCTOR_HANDOFF=/opt/akademia/data/hermes-conductor-handoff.json
+# CURSOR_API_KEY=   # host only, never in git
 EOF
   chmod 600 "$ENV_FILE"
   echo "UWAGA: utworzono $ENV_FILE — wklej LINEAR_OPS_READ i GITHUB_OPS_WRITE"
