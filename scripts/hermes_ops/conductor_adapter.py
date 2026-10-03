@@ -65,20 +65,38 @@ def sanitize_tests(raw: Any) -> list[dict[str, str]]:
 
 def sanitize_conductor(raw: Any, *, work_mode: str = "buduj") -> dict[str, Any]:
     blob = raw if isinstance(raw, dict) else {}
-    followups = blob.get("followups")
+    used_raw = blob.get("followups_used")
+    if used_raw is None:
+        used_raw = blob.get("followups")
     try:
-        n = int(followups) if followups is not None else 0
+        n = int(used_raw) if used_raw is not None else 0
     except (TypeError, ValueError):
         n = 0
     if n < 0:
         n = 0
+    ac_out: list[dict[str, str]] = []
+    ac_raw = blob.get("ac")
+    if isinstance(ac_raw, list):
+        for item in ac_raw[:40]:
+            if not isinstance(item, dict):
+                continue
+            vid = str(item.get("id") or item.get("label") or "").strip()[:80]
+            if not vid:
+                continue
+            ac_out.append({"id": vid, "verdict": _verdict(item.get("verdict") or item.get("status"))})
+    dod = blob.get("dod") if isinstance(blob.get("dod"), list) else []
+    local = blob.get("local_remaining") if isinstance(blob.get("local_remaining"), list) else []
     mode = sanitize_work_mode(blob.get("mode") or work_mode)
     return {
         "role": str(blob.get("role") or "nous")[:40],
         "model": str(blob.get("model") or "")[:80],
         "followups": n,
+        "followups_used": n,
         "mode": mode,
         "report_pl": str(blob.get("report_pl") or "")[:800],
+        "ac": ac_out,
+        "dod": [str(x).strip()[:80] for x in dod if str(x).strip()][:20],
+        "local_remaining": [str(x).strip()[:120] for x in local if str(x).strip()][:20],
     }
 
 
