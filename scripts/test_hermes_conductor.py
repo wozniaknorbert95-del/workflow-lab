@@ -135,7 +135,7 @@ def main() -> int:
     halted = step(
         handoff=handoff,
         live=live2,
-        ops={"status": "PAUSED"},
+        ops={"status": "PAUSED", "reason": "queued_pause"},
         key="secret",
         client=CloudClient("secret", fetch=fetch_halt),
     )
@@ -146,7 +146,7 @@ def main() -> int:
     again = step(
         handoff=handoff,
         live=halted.get("live"),
-        ops={"status": "PAUSED"},
+        ops={"status": "PAUSED", "reason": "queued_pause"},
         key="secret",
         client=CloudClient("secret", fetch=fetch_halt),
     )

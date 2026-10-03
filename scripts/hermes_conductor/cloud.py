@@ -119,6 +119,9 @@ class CloudClient:
     def archive(self, agent_id: str) -> dict[str, Any]:
         return self.call("POST", f"/{agent_id}/archive", {})
 
+    def unarchive(self, agent_id: str) -> dict[str, Any]:
+        return self.call("POST", f"/{agent_id}/unarchive", {})
+
 
 def busy_or_error(resp: dict[str, Any]) -> str:
     if resp.get("ok"):

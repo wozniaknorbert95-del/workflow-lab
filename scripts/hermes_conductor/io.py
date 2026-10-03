@@ -80,7 +80,15 @@ def repo_url(repo: str) -> str:
 
 
 def halt_requested(ops: dict[str, Any] | None) -> bool:
+    """Halt only on operator Stop/Pause/Take over — not idle PAUSED."""
     if not isinstance(ops, dict):
         return False
     engine = str(ops.get("engine") or ops.get("status") or "").upper()
-    return engine in ("PAUSED", "STOPPED")
+    reason = str(ops.get("reason") or "").lower()
+    if engine == "STOPPED":
+        return True
+    if engine == "PAUSED" and any(n in reason for n in ("queued_pause", "queued_stop", "queued_take", "take_over")):
+        return True
+    if any(n in reason for n in ("queued_pause", "queued_stop", "queued_take_over")):
+        return True
+    return False
