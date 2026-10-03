@@ -148,6 +148,7 @@ def step(
                 blob = dict(prev)
                 blob["refuse"] = "qui_hitl"
                 return {"ok": False, "state": "hitl", "wrote": True, "live": blob}
+            cli.unarchive(agent_id)
             resp = cli.followup_run(agent_id, _brief(handoff))
             if not resp.get("ok"):
                 why = busy_or_error(resp)
@@ -178,6 +179,7 @@ def step(
         return {"ok": True, "state": "unchanged", "wrote": False, "live": prev}
 
     if agent_id and not same_cmd:
+        cli.unarchive(agent_id)
         resp = cli.followup_run(agent_id, _brief(handoff))
         if not resp.get("ok"):
             why = busy_or_error(resp)
