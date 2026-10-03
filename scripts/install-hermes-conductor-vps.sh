@@ -16,6 +16,7 @@ if [[ ! -f "$ENV_FILE" ]]; then
   exit 1
 fi
 grep -q '^CURSOR_API_KEY=' "$ENV_FILE" || printf '\nCURSOR_API_KEY=\n' >>"$ENV_FILE"
+# Host paths stay in the systemd -e flags (/data/...). Do not put them in env-file.
 chmod 600 "$ENV_FILE"
 bash "$TARGET/scripts/install-hermes-conductor-docs.sh"
 docker build -t hermes-conductor:local -f "$TARGET/docs/ops/Dockerfile.hermes-conductor" "$TARGET"

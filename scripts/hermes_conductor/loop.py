@@ -5,15 +5,15 @@ from typing import Any
 
 from hermes_conductor.cloud import CloudClient, busy_or_error, extract_ids, tests_from_stream
 from hermes_conductor.io import (
-    HANDOFF,
-    MAX_FOLLOWUPS,
-    OPS_STATUS,
-    STATUS,
     cursor_key,
     halt_requested,
+    handoff_path,
+    max_followups,
     now_iso,
+    ops_status_path,
     read_json,
     repo_url,
+    status_path,
     work_mode,
     write_json,
 )
@@ -137,7 +137,7 @@ def step(
     if agent_id and same_cmd and run_url:
         ac = list((prev.get("conductor") or {}).get("ac") or [])
         if any(str(x.get("verdict")) == "FAIL" for x in ac if isinstance(x, dict)):
-            if followups >= MAX_FOLLOWUPS:
+            if followups >= max_followups():
                 blob = dict(prev)
                 blob["refuse"] = "qui_hitl"
                 return {"ok": False, "state": "hitl", "wrote": True, "live": blob}
@@ -228,11 +228,11 @@ def step(
 
 
 def run_once(*, fail_first: bool = False) -> dict[str, Any]:
-    handoff = read_json(HANDOFF)
-    live = read_json(STATUS)
-    ops = read_json(OPS_STATUS)
+    handoff = read_json(handoff_path())
+    live = read_json(status_path())
+    ops = read_json(ops_status_path())
     key = cursor_key()
     result = step(handoff=handoff, live=live, ops=ops, key=key, fail_first=fail_first)
     if result.get("wrote") and isinstance(result.get("live"), dict):
-        write_json(STATUS, result["live"])
+        write_json(status_path(), result["live"])
     return result

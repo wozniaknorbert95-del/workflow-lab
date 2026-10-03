@@ -22,7 +22,14 @@ def main() -> int:
     fail_first = str(os.environ.get("CONDUCTOR_FAIL_FIRST") or "").strip() in ("1", "true", "yes")
     once = "--once" in sys.argv
     while True:
-        result = run_once(fail_first=fail_first)
+        try:
+            result = run_once(fail_first=fail_first)
+        except Exception as exc:
+            print(f"conductor error {type(exc).__name__}", flush=True)
+            if once:
+                return 2
+            time.sleep(max(1.0, interval))
+            continue
         state = result.get("state") or "idle"
         print(f"conductor {state}", flush=True)
         if once:

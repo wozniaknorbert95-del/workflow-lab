@@ -7,11 +7,38 @@ import time
 from pathlib import Path
 from typing import Any
 
-HANDOFF = Path(os.environ.get("HERMES_CONDUCTOR_HANDOFF", "data/hermes-conductor-handoff.json"))
-STATUS = Path(os.environ.get("HERMES_CONDUCTOR_STATUS", "data/hermes-conductor-live.json"))
-OPS_STATUS = Path(os.environ.get("HERMES_OPS_STATUS", "data/ops-status.json"))
-MAX_FOLLOWUPS = int(os.environ.get("OPS_CONDUCTOR_MAX_FOLLOWUPS", "3") or "3")
 WORK_MODES = ("buduj", "testuj", "ulepszaj")
+
+
+def _path(name: str, default: str) -> Path:
+    return Path(os.environ.get(name) or default)
+
+
+def handoff_path() -> Path:
+    return _path("HERMES_CONDUCTOR_HANDOFF", "data/hermes-conductor-handoff.json")
+
+
+def status_path() -> Path:
+    return _path("HERMES_CONDUCTOR_STATUS", "data/hermes-conductor-live.json")
+
+
+def ops_status_path() -> Path:
+    return _path("HERMES_OPS_STATUS", "data/ops-status.json")
+
+
+def max_followups() -> int:
+    try:
+        n = int(os.environ.get("OPS_CONDUCTOR_MAX_FOLLOWUPS") or "3")
+    except (TypeError, ValueError):
+        n = 3
+    return n if n > 0 else 3
+
+
+# Import-time aliases for tests / older callers. Prefer the functions above.
+HANDOFF = handoff_path()
+STATUS = status_path()
+OPS_STATUS = ops_status_path()
+MAX_FOLLOWUPS = max_followups()
 
 
 def now_iso() -> str:

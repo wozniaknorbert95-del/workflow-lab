@@ -13,6 +13,7 @@ Environment=HERMES_CONDUCTOR_HANDOFF=/opt/akademia/data/hermes-conductor-handoff
 Environment=HERMES_OPS_STATUS=/opt/akademia/data/ops-status.json
 ExecStartPre=-/usr/bin/docker rm -f hermes-conductor
 ExecStart=/usr/bin/docker run --rm --name hermes-conductor \
+  --user 0:0 \
   --env-file /etc/workflow-lab/hermes-engineer.env \
   -e HERMES_CONDUCTOR_STATUS=/data/hermes-conductor-live.json \
   -e HERMES_CONDUCTOR_HANDOFF=/data/hermes-conductor-handoff.json \
