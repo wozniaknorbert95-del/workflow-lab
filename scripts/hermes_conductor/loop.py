@@ -4,6 +4,13 @@ from __future__ import annotations
 from typing import Any
 
 from hermes_conductor.cloud import CloudClient, busy_or_error, extract_ids, tests_from_stream
+
+
+def _tests(cli: CloudClient, agent_id: str, run_id: str) -> list[dict[str, str]]:
+    try:
+        return tests_from_stream(cli.stream(agent_id, run_id))
+    except Exception:
+        return []
 from hermes_conductor.io import (
     cursor_key,
     halt_requested,
@@ -141,6 +148,7 @@ def step(
                 blob = dict(prev)
                 blob["refuse"] = "qui_hitl"
                 return {"ok": False, "state": "hitl", "wrote": True, "live": blob}
+            cli.unarchive(agent_id)
             resp = cli.followup_run(agent_id, _brief(handoff))
             if not resp.get("ok"):
                 why = busy_or_error(resp)
@@ -156,8 +164,7 @@ def step(
                 return {"ok": False, "state": "refuse", "wrote": True, "live": blob}
             new_id, new_run, new_url = extract_ids(resp)
             use_id = new_id or agent_id
-            stream = cli.stream(use_id, new_run or run_id)
-            tests = tests_from_stream(stream)
+            tests = _tests(cli, use_id, new_run or run_id)
             blob = _live(
                 handoff,
                 agent_id=use_id,
@@ -172,6 +179,7 @@ def step(
         return {"ok": True, "state": "unchanged", "wrote": False, "live": prev}
 
     if agent_id and not same_cmd:
+        cli.unarchive(agent_id)
         resp = cli.followup_run(agent_id, _brief(handoff))
         if not resp.get("ok"):
             why = busy_or_error(resp)
@@ -179,7 +187,7 @@ def step(
             return {"ok": False, "state": "refuse", "wrote": True, "live": blob}
         new_id, new_run, new_url = extract_ids(resp)
         use_id = new_id or agent_id
-        tests = tests_from_stream(cli.stream(use_id, new_run or ""))
+        tests = _tests(cli, use_id, new_run or "")
         blob = _live(
             handoff,
             agent_id=use_id,
@@ -203,7 +211,7 @@ def step(
         blob = _live(handoff, refuse=why, report=f"Create padł: {why}.")
         return {"ok": False, "state": "refuse", "wrote": True, "live": blob}
     agent_id, run_id, run_url = extract_ids(resp)
-    tests = tests_from_stream(cli.stream(agent_id, run_id))
+    tests = _tests(cli, agent_id, run_id)
     ac_verdict = "FAIL" if fail_first else "UNKNOWN"
     if tests and not fail_first:
         ac_verdict = "PASS" if all(t.get("verdict") != "FAIL" for t in tests) else "FAIL"

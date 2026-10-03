@@ -9,7 +9,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from hermes_conductor.cloud import CloudClient
+from hermes_conductor.cloud import CloudClient, _parse_body
 from hermes_conductor.loop import step
 
 
@@ -22,6 +22,12 @@ def main() -> int:
         "work_mode": "buduj",
         "cmd_id": "abc123",
     }
+
+    sse = _parse_body('event: tool_call\ndata: {"cmd":"pytest","excerpt":"1 passed","verdict":"PASS"}\n\n')
+    if not sse.get("events") or sse["events"][0].get("verdict") != "PASS":
+        errors.append(f"SSE parse, got {sse}")
+    if _parse_body("{not-json") .get("events") is None:
+        errors.append("broken JSON must not raise")
 
     idle = step(handoff=None, live=None, ops=None, key="k")
     if idle.get("state") != "idle" or idle.get("wrote"):
@@ -129,7 +135,7 @@ def main() -> int:
     halted = step(
         handoff=handoff,
         live=live2,
-        ops={"status": "PAUSED"},
+        ops={"status": "PAUSED", "reason": "queued_pause"},
         key="secret",
         client=CloudClient("secret", fetch=fetch_halt),
     )
@@ -140,7 +146,7 @@ def main() -> int:
     again = step(
         handoff=handoff,
         live=halted.get("live"),
-        ops={"status": "PAUSED"},
+        ops={"status": "PAUSED", "reason": "queued_pause"},
         key="secret",
         client=CloudClient("secret", fetch=fetch_halt),
     )

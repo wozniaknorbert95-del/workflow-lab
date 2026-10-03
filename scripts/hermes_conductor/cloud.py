@@ -17,26 +17,59 @@ def _auth_header(key: str) -> str:
     return f"Basic {token}"
 
 
-def default_fetch(method: str, url: str, payload: dict[str, Any] | None, key: str) -> dict[str, Any]:
+def _parse_body(raw: str) -> dict[str, Any]:
+    text = (raw or "").strip()
+    if not text:
+        return {}
+    if text[:1] in "{[":
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError:
+            parsed = None
+        if isinstance(parsed, dict):
+            return parsed
+        if isinstance(parsed, list):
+            return {"events": parsed}
+    events: list[Any] = []
+    for line in text.splitlines():
+        if not line.startswith("data:"):
+            continue
+        chunk = line[5:].strip()
+        if not chunk or chunk == "[DONE]":
+            continue
+        try:
+            item = json.loads(chunk)
+        except json.JSONDecodeError:
+            item = {"cmd": "sse", "excerpt": chunk[:400], "verdict": "UNKNOWN"}
+        events.append(item)
+    return {"events": events}
+
+
+def default_fetch(
+    method: str,
+    url: str,
+    payload: dict[str, Any] | None,
+    key: str,
+    *,
+    timeout: int = 60,
+) -> dict[str, Any]:
     data = None if payload is None else json.dumps(payload).encode("utf-8")
     req = Request(url, data=data, method=method)
     req.add_header("Authorization", _auth_header(key))
     if data is not None:
         req.add_header("Content-Type", "application/json")
     try:
-        with urlopen(req, timeout=60) as resp:
-            raw = resp.read().decode("utf-8")
-            body = json.loads(raw) if raw.strip() else {}
-            return {"ok": True, "code": int(resp.status), "body": body}
+        with urlopen(req, timeout=timeout) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+            return {"ok": True, "code": int(resp.status), "body": _parse_body(raw)}
     except HTTPError as exc:
         raw = exc.read().decode("utf-8", errors="replace")
-        try:
-            body = json.loads(raw) if raw.strip() else {}
-        except Exception:
+        body = _parse_body(raw)
+        if not body:
             body = {"error": raw[:200]}
         return {"ok": False, "code": int(exc.code), "body": body}
-    except URLError as exc:
-        return {"ok": False, "code": 0, "body": {"error": str(exc.reason)[:120]}}
+    except (URLError, TimeoutError, json.JSONDecodeError) as exc:
+        return {"ok": False, "code": 0, "body": {"error": str(exc)[:120]}}
 
 
 class CloudClient:
@@ -44,11 +77,18 @@ class CloudClient:
         self.key = key
         self._fetch = fetch
 
-    def call(self, method: str, path: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    def call(
+        self,
+        method: str,
+        path: str,
+        payload: dict[str, Any] | None = None,
+        *,
+        timeout: int = 60,
+    ) -> dict[str, Any]:
         url = path if path.startswith("http") else f"{API}{path}"
         if self._fetch is not None:
             return self._fetch(method, url, payload)
-        return default_fetch(method, url, payload, self.key)
+        return default_fetch(method, url, payload, self.key, timeout=timeout)
 
     def create(self, prompt: str, repo: str, *, auto_pr: bool, name: str) -> dict[str, Any]:
         return self.call(
@@ -69,13 +109,18 @@ class CloudClient:
         return self.call("POST", f"/{agent_id}/runs", {"prompt": {"text": prompt[:20000]}})
 
     def stream(self, agent_id: str, run_id: str) -> dict[str, Any]:
-        return self.call("GET", f"/{agent_id}/runs/{run_id}/stream", None)
+        if not agent_id or not run_id:
+            return {"ok": True, "code": 200, "body": {"events": []}}
+        return self.call("GET", f"/{agent_id}/runs/{run_id}/stream", None, timeout=15)
 
     def cancel(self, agent_id: str, run_id: str) -> dict[str, Any]:
         return self.call("POST", f"/{agent_id}/runs/{run_id}/cancel", {})
 
     def archive(self, agent_id: str) -> dict[str, Any]:
         return self.call("POST", f"/{agent_id}/archive", {})
+
+    def unarchive(self, agent_id: str) -> dict[str, Any]:
+        return self.call("POST", f"/{agent_id}/unarchive", {})
 
 
 def busy_or_error(resp: dict[str, Any]) -> str:
