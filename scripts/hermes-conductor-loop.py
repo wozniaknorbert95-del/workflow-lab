@@ -31,7 +31,13 @@ def main() -> int:
             time.sleep(max(1.0, interval))
             continue
         state = result.get("state") or "idle"
-        print(f"conductor {state}", flush=True)
+        refuse = ""
+        live = result.get("live") if isinstance(result.get("live"), dict) else {}
+        if isinstance(live, dict):
+            refuse = str(live.get("refuse") or "")
+        extra = f" refuse={refuse}" if refuse else ""
+        url = ((live.get("agent") or {}) if isinstance(live, dict) else {}).get("run_url") or ""
+        print(f"conductor {state}{extra} url={bool(url)}", flush=True)
         if once:
             return 0 if result.get("ok") or state == "idle" else 2
         time.sleep(max(1.0, interval))
