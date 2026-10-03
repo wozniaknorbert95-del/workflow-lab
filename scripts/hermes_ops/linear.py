@@ -29,6 +29,7 @@ QUEUE_QUERY = """
 query OpsQueue($first: Int!, $names: [String!]!) {
   issues(
     first: $first
+    orderBy: updatedAt
     filter: {
       project: { name: { in: $names } }
       state: { type: { nin: ["completed", "canceled"] } }

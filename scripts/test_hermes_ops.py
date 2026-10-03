@@ -639,6 +639,10 @@ def main() -> int:
         for label, src in (("tick", tick_src), ("adapter", adapter_src), ("orchestrator", orch_src)):
             if "api.cursor.com" in src:
                 errors.append(f"{label} must not call Cursor HTTP API")
+        from hermes_ops.linear import QUEUE_QUERY
+
+        if "orderBy: updatedAt" not in QUEUE_QUERY:
+            errors.append("Linear queue must orderBy updatedAt so fresh agent issues are pickable")
 
         # Legacy GitHubOps.ensure_cursor_trigger stays for merge-era tools, not S2.
         snap = len(calls)
