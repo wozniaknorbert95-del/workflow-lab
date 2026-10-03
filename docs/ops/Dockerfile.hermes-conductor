@@ -1,0 +1,8 @@
+# Nous conductor — Cloud API caller. No secrets in the image.
+FROM python:3.12-slim
+WORKDIR /app
+COPY scripts/hermes_conductor /app/hermes_conductor
+COPY scripts/hermes-conductor-loop.py /app/hermes-conductor-loop.py
+ENV PYTHONUNBUFFERED=1
+USER nobody
+CMD ["python", "/app/hermes-conductor-loop.py"]

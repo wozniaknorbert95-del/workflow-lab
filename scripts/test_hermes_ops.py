@@ -537,6 +537,45 @@ def main() -> int:
         if str(s2.get("status") or "").upper() != "PASS":
             errors.append(f"S2 must PASS with https run_url, got {s2}")
 
+        from hermes_ops.conductor_adapter import merge_conductor_into_live, sanitize_conductor
+
+        hud = sanitize_conductor(
+            {
+                "followups": 1,
+                "mode": "buduj",
+                "report_pl": "Padło AC-1. Do laptopa: nic.",
+                "ac": [{"id": "AC-1", "verdict": "FAIL"}],
+                "dod": ["W-05"],
+                "local_remaining": ["Deploy — Zasada 11"],
+            }
+        )
+        if hud.get("followups_used") != 1 or hud.get("followups") != 1:
+            errors.append(f"followups must map to followups_used, got {hud}")
+        if not hud.get("ac") or hud["ac"][0].get("verdict") != "FAIL":
+            errors.append(f"sanitize_conductor must keep FAIL AC, got {hud.get('ac')}")
+        if hud.get("dod") != ["W-05"] or "Zasada 11" not in (hud.get("local_remaining") or [""])[0]:
+            errors.append(f"sanitize_conductor must keep dod/local_remaining, got {hud}")
+        merged_fail = merge_conductor_into_live(
+            {"issue": "QUI-ZZ", "agent": {}},
+            {
+                "issue": "QUI-ZZ",
+                "tests": [{"cmd": "pytest", "excerpt": "1 failed", "verdict": "FAIL"}],
+                "conductor": {
+                    "ac": [{"id": "AC-1", "verdict": "FAIL"}],
+                    "dod": ["W-05"],
+                    "local_remaining": ["laptop"],
+                    "followups_used": 1,
+                    "report_pl": "FAIL AC",
+                },
+            },
+            work_mode="buduj",
+        )
+        if (merged_fail or {}).get("agent", {}).get("run_url"):
+            errors.append("FAIL AC blob must not invent run_url")
+        cond_fail = (merged_fail or {}).get("conductor") or {}
+        if cond_fail.get("followups_used") != 1 or (cond_fail.get("ac") or [{}])[0].get("verdict") != "FAIL":
+            errors.append(f"merge must copy FAIL AC + followups_used, got {cond_fail}")
+
         engine_http = Engine(
             github=gh,
             mode="MANUAL",

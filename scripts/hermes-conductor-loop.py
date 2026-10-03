@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+"""Nous conductor daemon. Watches handoff, writes live JSON, calls Cloud API.
+
+Not the tick. Tick only copies hermes-conductor-live.json into ops-status.json.
+"""
+from __future__ import annotations
+
+import os
+import sys
+import time
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from hermes_conductor.loop import run_once
+
+
+def main() -> int:
+    interval = float(os.environ.get("HERMES_CONDUCTOR_POLL_SEC") or "3")
+    fail_first = str(os.environ.get("CONDUCTOR_FAIL_FIRST") or "").strip() in ("1", "true", "yes")
+    once = "--once" in sys.argv
+    while True:
+        result = run_once(fail_first=fail_first)
+        state = result.get("state") or "idle"
+        print(f"conductor {state}", flush=True)
+        if once:
+            return 0 if result.get("ok") or state == "idle" else 2
+        time.sleep(max(1.0, interval))
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

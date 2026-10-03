@@ -1,0 +1,27 @@
+[Unit]
+Description=Hermes Nous conductor (Cursor Cloud API)
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=5
+EnvironmentFile=-/etc/workflow-lab/hermes-engineer.env
+Environment=HERMES_CONDUCTOR_STATUS=/opt/akademia/data/hermes-conductor-live.json
+Environment=HERMES_CONDUCTOR_HANDOFF=/opt/akademia/data/hermes-conductor-handoff.json
+Environment=HERMES_OPS_STATUS=/opt/akademia/data/ops-status.json
+ExecStartPre=-/usr/bin/docker rm -f hermes-conductor
+ExecStart=/usr/bin/docker run --rm --name hermes-conductor \
+  --env-file /etc/workflow-lab/hermes-engineer.env \
+  -e HERMES_CONDUCTOR_STATUS=/data/hermes-conductor-live.json \
+  -e HERMES_CONDUCTOR_HANDOFF=/data/hermes-conductor-handoff.json \
+  -e HERMES_OPS_STATUS=/data/ops-status.json \
+  -e HERMES_HOME=/hermes \
+  -v /opt/akademia/data:/data \
+  -v /var/lib/hermes-conductor:/hermes:ro \
+  hermes-conductor:local
+ExecStop=/usr/bin/docker stop hermes-conductor
+
+[Install]
+WantedBy=multi-user.target
