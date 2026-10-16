@@ -136,16 +136,37 @@ def write_handoff(
     work_mode: str = "buduj",
     cmd_id: str = "",
     path: Path | None = None,
+    fetch_linear: bool = True,
 ) -> Path:
+    from hermes_ops.issue_brief import enrich_issue
+
     target = path or HANDOFF_PATH
     target.parent.mkdir(parents=True, exist_ok=True)
+    enriched = enrich_issue(issue if isinstance(issue, dict) else {}, fetch_linear=fetch_linear)
+    ac_raw = enriched.get("ac") if isinstance(enriched.get("ac"), list) else []
+    ac_out: list[str] = []
+    for item in ac_raw[:20]:
+        text = str(item).strip()[:160]
+        if text:
+            ac_out.append(text)
+    excerpts = enriched.get("dor_excerpts") if isinstance(enriched.get("dor_excerpts"), dict) else {}
+    dor_out: dict[str, str] = {}
+    for key, val in excerpts.items():
+        k = str(key).strip()[:80]
+        v = str(val).strip()[:600]
+        if k and v:
+            dor_out[k] = v
     payload = {
-        "issue_id": str(issue.get("id") or issue.get("identifier") or ""),
-        "title": str(issue.get("title") or "")[:200],
-        "repo": str(issue.get("repo") or "workflow-lab"),
-        "labels": list(issue.get("labels") or []),
+        "issue_id": str(enriched.get("id") or enriched.get("identifier") or "")[:40],
+        "title": str(enriched.get("title") or "")[:200],
+        "repo": str(enriched.get("repo") or "workflow-lab")[:80],
+        "url": str(enriched.get("url") or "")[:300],
+        "labels": [str(x)[:60] for x in (enriched.get("labels") or [])][:30],
         "work_mode": sanitize_work_mode(work_mode),
         "cmd_id": str(cmd_id or ""),
+        "brief_kind": str(enriched.get("brief_kind") or "real")[:20],
+        "ac": ac_out,
+        "dor_excerpts": dor_out,
         "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
     tmp = target.with_suffix(".tmp")
