@@ -138,13 +138,27 @@ def step(
     if not handoff:
         return {"ok": True, "state": "idle", "wrote": False}
 
-    issue = str(handoff.get("issue_id") or "")
+    issue = str(handoff.get("issue_id") or "").strip()
+    if not issue:
+        return {"ok": True, "state": "idle", "wrote": False}
+
     prev = live if isinstance(live, dict) else {}
     agent_id, run_id, run_url = _agent_fields(prev)
     followups = int((prev.get("conductor") or {}).get("followups_used") or prev.get("followups") or 0)
-    cmd_id = str(handoff.get("cmd_id") or "")
-    same_cmd = bool(cmd_id and cmd_id == str(prev.get("cmd_id") or ""))
-    same_issue = bool(issue and issue == str(prev.get("issue") or prev.get("issue_id") or ""))
+    cmd_id = str(handoff.get("cmd_id") or "").strip()
+    same_cmd = bool(cmd_id and cmd_id == str(prev.get("cmd_id") or "").strip())
+    same_issue = bool(issue and issue == str(prev.get("issue") or prev.get("issue_id") or "").strip())
+
+    # Fail-closed: empty cmd_id must never create (was create-spam every poll).
+    if not cmd_id:
+        if agent_id and run_url and same_issue:
+            return {"ok": True, "state": "unchanged", "wrote": False, "live": prev}
+        blob = _live(
+            handoff,
+            refuse="missing_cmd_id",
+            report="Handoff bez cmd_id — brak Start/ack. Zero create.",
+        )
+        return {"ok": False, "state": "refuse", "wrote": True, "live": blob}
 
     if halt_requested(ops) and agent_id and not prev.get("halted"):
         cli = client or CloudClient(key)
