@@ -227,6 +227,34 @@ def main() -> int:
     if busy_or_error({"ok": False, "code": 403, "body": {"error": "forbidden"}}) != "cursor_api_auth":
         errors.append("T6 403 must be cursor_api_auth")
 
+    # T10: empty cmd_id must not create (anti spam)
+    spam_calls: list[tuple[str, str]] = []
+
+    def fetch_spam(method: str, url: str, payload: dict[str, Any] | None) -> dict[str, Any]:
+        spam_calls.append((method, url))
+        return {"ok": True, "code": 200, "body": {}}
+
+    no_cmd = step(
+        handoff={**handoff, "cmd_id": ""},
+        live=None,
+        ops=None,
+        key="secret",
+        client=CloudClient("secret", fetch=fetch_spam),
+    )
+    if (no_cmd.get("live") or {}).get("refuse") != "missing_cmd_id":
+        errors.append(f"T10 empty cmd_id must refuse missing_cmd_id, got {no_cmd}")
+    if any(u.rstrip("/").endswith("/agents") and m == "POST" for m, u in spam_calls):
+        errors.append(f"T10 empty cmd_id must not POST create, calls={spam_calls}")
+    keep = step(
+        handoff={**handoff, "cmd_id": ""},
+        live=live1,
+        ops=None,
+        key="secret",
+        client=CloudClient("secret", fetch=fetch_spam),
+    )
+    if keep.get("state") != "unchanged" or keep.get("wrote"):
+        errors.append(f"T10 empty cmd_id + existing URL must unchanged, got {keep}")
+
     # T5: halt clears run_url
     halt_calls: list[str] = []
 
