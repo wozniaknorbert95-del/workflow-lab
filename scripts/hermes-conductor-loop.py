@@ -35,9 +35,26 @@ def main() -> int:
         live = result.get("live") if isinstance(result.get("live"), dict) else {}
         if isinstance(live, dict):
             refuse = str(live.get("refuse") or "")
-        extra = f" refuse={refuse}" if refuse else ""
-        url = ((live.get("agent") or {}) if isinstance(live, dict) else {}).get("run_url") or ""
-        print(f"conductor {state}{extra} url={bool(url)}", flush=True)
+        agent = (live.get("agent") or {}) if isinstance(live, dict) else {}
+        agent_id = str(agent.get("agent_id") or "")[:36]
+        url = bool(agent.get("run_url"))
+        create_ms = result.get("create_ms")
+        if create_ms is None and isinstance(live, dict):
+            create_ms = live.get("create_ms")
+        http = result.get("http")
+        if http is None and isinstance(live, dict):
+            http = live.get("http")
+        parts = [f"conductor {state}"]
+        if refuse:
+            parts.append(f"refuse={refuse}")
+        if agent_id:
+            parts.append(f"agent={agent_id}")
+        if http is not None:
+            parts.append(f"http={http}")
+        if create_ms is not None:
+            parts.append(f"create_ms={create_ms}")
+        parts.append(f"url={url}")
+        print(" ".join(parts), flush=True)
         if once:
             return 0 if result.get("ok") or state == "idle" else 2
         time.sleep(max(1.0, interval))

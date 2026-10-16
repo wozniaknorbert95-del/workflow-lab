@@ -11,11 +11,15 @@ import time
 from pathlib import Path
 from typing import Any
 
+# Defaults match orchestrator lock_parent siblings when env unset on VPS data dir.
+_DEFAULT_DATA = Path(os.environ.get("ACADEMY_DATA_DIR") or "data")
 STATUS_PATH = Path(
-    os.environ.get("HERMES_CONDUCTOR_STATUS", "data/hermes-conductor-live.json")
+    os.environ.get("HERMES_CONDUCTOR_STATUS")
+    or str(_DEFAULT_DATA / "hermes-conductor-live.json")
 )
 HANDOFF_PATH = Path(
-    os.environ.get("HERMES_CONDUCTOR_HANDOFF", "data/hermes-conductor-handoff.json")
+    os.environ.get("HERMES_CONDUCTOR_HANDOFF")
+    or str(_DEFAULT_DATA / "hermes-conductor-handoff.json")
 )
 WORK_MODES = ("buduj", "testuj", "ulepszaj")
 DEFAULT_TTL_SEC = 900
@@ -164,15 +168,29 @@ def merge_conductor_into_live(
     src = blob if isinstance(blob, dict) else {}
     agent_src = src.get("agent") if isinstance(src.get("agent"), dict) else {}
     existing = out.get("agent") if isinstance(out.get("agent"), dict) else {}
-    run_url = https_url(agent_src.get("run_url") or agent_src.get("url") or existing.get("run_url"))
-    run_id = str(agent_src.get("run_id") or existing.get("run_id") or "")[:80]
+    live_issue = str(out.get("issue") or out.get("issue_id") or "").strip()
+    src_issue = str(src.get("issue") or src.get("issue_id") or "").strip()
+    halted = bool(src.get("halted"))
+    # Purge ghost URL on halt or foreign-issue leftover (not every refuse — keep same-session URL).
+    purge = halted or (bool(src_issue) and bool(live_issue) and src_issue != live_issue)
+    if purge:
+        run_url = ""
+    else:
+        run_url = https_url(agent_src.get("run_url") or agent_src.get("url") or existing.get("run_url"))
+    run_id = str(agent_src.get("run_id") or ("" if purge else existing.get("run_id")) or "")[:80]
+    agent_id = str(agent_src.get("agent_id") or ("" if purge else existing.get("agent_id")) or "")[:80]
     model = str(agent_src.get("model") or existing.get("model") or "")[:80]
     out["agent"] = {
         "provider": str(agent_src.get("provider") or existing.get("provider") or ("cursor-cloud" if run_url else "")),
         "run_url": run_url,
         "model": model,
         "run_id": run_id,
+        "agent_id": agent_id,
     }
+    if halted:
+        out["halted"] = True
+    elif "halted" in out:
+        out.pop("halted", None)
     tests = sanitize_tests(src.get("tests"))
     if tests:
         out["tests"] = tests
@@ -188,7 +206,7 @@ def merge_conductor_into_live(
             step["status"] = "PASS"
             step["reason"] = ""
             step["evidence"] = [
-                {"kind": "cursor_cloud_api", "run_url": run_url, "run_id": run_id or None}
+                {"kind": "cursor_cloud_api", "run_url": run_url, "run_id": run_id or agent_id or None}
             ]
         if steps:
             out["steps"] = steps

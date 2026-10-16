@@ -131,12 +131,13 @@ class Engine:
         tmp.replace(self.state_path)
 
     def _conductor_paths(self) -> tuple[Path, Path]:
-        root = self.lock_path.parent
+        # Prefer ACADEMY_DATA_DIR (same default as conductor_adapter) over lock_parent.
+        data = Path(os.environ.get("ACADEMY_DATA_DIR") or self.lock_path.parent)
         status = os.environ.get("HERMES_CONDUCTOR_STATUS")
         handoff = os.environ.get("HERMES_CONDUCTOR_HANDOFF")
         return (
-            Path(status) if status else root / "hermes-conductor-live.json",
-            Path(handoff) if handoff else root / "hermes-conductor-handoff.json",
+            Path(status) if status else data / "hermes-conductor-live.json",
+            Path(handoff) if handoff else data / "hermes-conductor-handoff.json",
         )
 
     def pick_next(self, issues: list[dict[str, Any]], issue_id: str = "") -> dict[str, Any] | None:
@@ -218,6 +219,16 @@ class Engine:
         src = blob if blob is not None else load_conductor_status(status_path)
         why = refuse_of(src, issue_id)
         if why:
+            # Clear URL when conductor halted or blob issue ≠ active lock/live issue.
+            src_issue = str((src or {}).get("issue") or (src or {}).get("issue_id") or "").strip()
+            halted = bool((src or {}).get("halted"))
+            foreign = bool(src_issue and issue_id and src_issue != issue_id)
+            if self.live and (halted or foreign):
+                self.live = merge_conductor_into_live(
+                    self.live,
+                    src or {"halted": True, "issue": src_issue or issue_id},
+                    work_mode=sanitize_work_mode(self._lock().get("work_mode")),
+                )
             return {"ok": False, "code": 403, "error": why}
         if self.live:
             work_mode = sanitize_work_mode(self._lock().get("work_mode"))

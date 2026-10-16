@@ -923,6 +923,29 @@ def main() -> int:
         if str(s3.get("reason") or "") != "no PR yet" and str(s3.get("status") or "").upper() != "UNKNOWN":
             errors.append(f"no PR S3 expect UNKNOWN/no PR yet, got {s3}")
 
+    # Conductor adapter: halt / foreign-issue purge ghost run_url; path defaults.
+    from hermes_ops.conductor_adapter import merge_conductor_into_live
+
+    purged = merge_conductor_into_live(
+        {"issue": "QUI-1", "agent": {"run_url": "https://cursor.com/agents/old"}},
+        {"issue": "QUI-1", "halted": True, "agent": {"run_url": "https://cursor.com/agents/old"}},
+    )
+    if (purged or {}).get("agent", {}).get("run_url"):
+        errors.append(f"adapter halt must clear run_url, got {purged}")
+    foreign = merge_conductor_into_live(
+        {"issue": "QUI-1", "agent": {"run_url": "https://cursor.com/agents/old"}},
+        {"issue": "QUI-2", "agent": {"run_url": "https://cursor.com/agents/new"}},
+    )
+    if (foreign or {}).get("agent", {}).get("run_url"):
+        errors.append(f"adapter foreign issue must clear run_url, got {foreign}")
+    with tempfile.TemporaryDirectory() as tmp:
+        os.environ["ACADEMY_DATA_DIR"] = tmp
+        eng_paths = Engine(lock_path=Path(tmp) / "lock.json", state_path=Path(tmp) / "state.json")
+        st, hd = eng_paths._conductor_paths()
+        if st.parent != Path(tmp) or hd.parent != Path(tmp):
+            errors.append(f"conductor paths must honor ACADEMY_DATA_DIR, got {st} {hd}")
+        os.environ.pop("ACADEMY_DATA_DIR", None)
+
     if errors:
         print("FAIL:")
         for item in errors:
