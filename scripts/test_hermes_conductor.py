@@ -10,8 +10,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from hermes_conductor.cloud import CloudClient, _parse_body, busy_or_error
-from hermes_conductor.loop import step
-from hermes_ops.conductor_adapter import merge_conductor_into_live
+from hermes_conductor.loop import _brief, step
+from hermes_ops.conductor_adapter import merge_conductor_into_live, write_handoff
+from hermes_ops.issue_brief import extract_ac_list, extract_dor_excerpts, resolve_brief_kind
 
 
 def main() -> int:
@@ -22,6 +23,7 @@ def main() -> int:
         "repo": "workflow-lab",
         "work_mode": "buduj",
         "cmd_id": "abc123",
+        "brief_kind": "lab_probe",
     }
 
     sse = _parse_body('event: tool_call\ndata: {"cmd":"pytest","excerpt":"1 passed","verdict":"PASS"}\n\n')
@@ -337,12 +339,169 @@ def main() -> int:
         if "def followup(self" in cloud_src:
             errors.append("dead CloudClient.followup must be removed")
 
+    # T11: real Autopilot brief — no lab probe, uses repo + /autopilot + AC
+    real_ho = {
+        "issue_id": "QUI-43",
+        "title": "brand-kit martwe zasoby",
+        "repo": "dsaas-platform-main",
+        "url": "https://linear.app/quietforge/issue/QUI-43",
+        "work_mode": "buduj",
+        "cmd_id": "real1",
+        "brief_kind": "real",
+        "ac": ["AC-1: usuń lub podłącz brand-kit/*"],
+        "dor_excerpts": {
+            "cel": "Usunąć martwe pliki brand-kit albo je wpiąć.",
+            "kryteria akceptacji": "- [ ] zero martwych plików albo realny konsument",
+        },
+    }
+    real_text = _brief(real_ho)
+    if "conductor-lab-probe" in real_text:
+        errors.append("T11 real brief must not mention conductor-lab-probe")
+    if "Repo=dsaas-platform-main" not in real_text:
+        errors.append(f"T11 real brief must use platform repo, got snippet={real_text[:200]}")
+    if "autopilot.md" not in real_text:
+        errors.append("T11 real brief must point at .cursor/commands/autopilot.md")
+    if "AC-1" not in real_text or "brand-kit" not in real_text:
+        errors.append("T11 real brief must include AC / brand-kit")
+    if "Repo=workflow-lab" in real_text and "dsaas-platform-main" not in real_text:
+        errors.append("T11 must not hardcode workflow-lab over platform")
+
+    lab_text = _brief({**handoff, "brief_kind": "lab_probe"})
+    if "conductor-lab-probe.md" not in lab_text:
+        errors.append("T11 lab_probe brief must keep probe file instruction")
+
+    if resolve_brief_kind({"id": "QUI-131", "repo": "workflow-lab"}) != "lab_probe":
+        errors.append("T11 QUI-131 must resolve lab_probe")
+    if resolve_brief_kind({"id": "QUI-43", "repo": "dsaas-platform-main"}) != "real":
+        errors.append("T11 QUI-43 must resolve real")
+
+    desc = (
+        "## Cel\nUsunąć martwe brand-kit.\n"
+        "## Kryteria akceptacji\n- [ ] pliki usunięte albo podłączone\n- [ ] zero dead imports\n"
+        "## Ograniczenia\nZero deploy.\n"
+    )
+    excerpts = extract_dor_excerpts(desc)
+    if "cel" not in excerpts or "kryteria akceptacji" not in excerpts:
+        errors.append(f"T11 dor excerpts, got {list(excerpts)}")
+    ac_list = extract_ac_list(desc, excerpts)
+    if len(ac_list) < 2:
+        errors.append(f"T11 ac list expect >=2, got {ac_list}")
+
+    create_prompts: list[str] = []
+
+    def fetch_real(method: str, url: str, payload: dict[str, Any] | None) -> dict[str, Any]:
+        if method == "POST" and url.rstrip("/").endswith("/agents"):
+            if isinstance(payload, dict):
+                create_prompts.append(str(((payload.get("prompt") or {}).get("text") or "")))
+            return {
+                "ok": True,
+                "code": 200,
+                "body": {
+                    "agent": {"id": "bc-real", "url": "https://cursor.com/agents/bc-real"},
+                    "run": {"id": "run-r1"},
+                },
+            }
+        if "/archive" in url:
+            return {"ok": True, "code": 200, "body": {}}
+        return {"ok": True, "code": 200, "body": {}}
+
+    real_created = step(
+        handoff=real_ho,
+        live=None,
+        ops=None,
+        key="secret",
+        client=CloudClient("secret", fetch=fetch_real),
+    )
+    if real_created.get("state") != "created":
+        errors.append(f"T11 real create, got {real_created}")
+    if not create_prompts or "conductor-lab-probe" in create_prompts[0]:
+        errors.append(f"T11 create prompt must be real, got {create_prompts[:1]}")
+    real_ac = ((real_created.get("live") or {}).get("conductor") or {}).get("ac") or []
+    if not real_ac or str(real_ac[0].get("verdict")) != "UNKNOWN":
+        errors.append(f"T11 real create AC must UNKNOWN, got {real_ac}")
+
+    # T11b: write_handoff enrich without Linear network
+    with __import__("tempfile").TemporaryDirectory() as tmp:
+        hd = Path(tmp) / "handoff.json"
+        write_handoff(
+            {
+                "id": "QUI-43",
+                "title": "brand-kit",
+                "repo": "dsaas-platform-main",
+                "labels": ["agent"],
+                "description": desc,
+            },
+            work_mode="buduj",
+            cmd_id="cmd-x",
+            path=hd,
+            fetch_linear=False,
+        )
+        blob = __import__("json").loads(hd.read_text(encoding="utf-8"))
+        if blob.get("brief_kind") != "real":
+            errors.append(f"T11b handoff brief_kind, got {blob.get('brief_kind')}")
+        if blob.get("repo") != "dsaas-platform-main":
+            errors.append(f"T11b repo, got {blob.get('repo')}")
+        if not blob.get("ac"):
+            errors.append("T11b handoff must carry ac")
+        if "description" in blob:
+            errors.append("T11b must not persist raw description")
+        if "kryteria akceptacji" not in (blob.get("dor_excerpts") or {}):
+            errors.append(f"T11b dor_excerpts, got {blob.get('dor_excerpts')}")
+
+    # T12: real FAIL AC → steer follow-up (no probe text)
+    steer_prompts: list[str] = []
+
+    def fetch_steer(method: str, url: str, payload: dict[str, Any] | None) -> dict[str, Any]:
+        if method == "POST" and url.rstrip("/").endswith("/runs"):
+            if isinstance(payload, dict):
+                steer_prompts.append(str(((payload.get("prompt") or {}).get("text") or "")))
+            return {
+                "ok": True,
+                "code": 200,
+                "body": {
+                    "agent": {"id": "bc-real", "url": "https://cursor.com/agents/bc-real"},
+                    "run": {"id": "run-r2"},
+                },
+            }
+        if "/unarchive" in url or "/stream" in url:
+            if "/stream" in url:
+                raise RuntimeError("no stream")
+            return {"ok": True, "code": 200, "body": {}}
+        return {"ok": True, "code": 200, "body": {}}
+
+    live_fail = {
+        "issue": "QUI-43",
+        "cmd_id": "real1",
+        "agent": {
+            "agent_id": "bc-real",
+            "run_id": "run-r1",
+            "run_url": "https://cursor.com/agents/bc-real",
+        },
+        "conductor": {"ac": [{"id": "AC-1", "verdict": "FAIL"}], "followups_used": 0},
+    }
+    steered = step(
+        handoff=real_ho,
+        live=live_fail,
+        ops=None,
+        key="secret",
+        client=CloudClient("secret", fetch=fetch_steer),
+    )
+    if steered.get("state") != "followup":
+        errors.append(f"T12 real FAIL must followup, got {steered}")
+    if not steer_prompts or "conductor-lab-probe" in steer_prompts[0]:
+        errors.append(f"T12 steer must be real brief, got {steer_prompts[:1]}")
+    if steer_prompts and "FOLLOW-UP" not in steer_prompts[0] and "autopilot" not in steer_prompts[0].lower():
+        errors.append(f"T12 steer should mention FOLLOW-UP or autopilot, got {steer_prompts[0][:180]}")
+
     if errors:
         print("FAIL:")
         for item in errors:
             print(" -", item)
         return 1
-    print("PASS: hermes_conductor T1-T9 (early live, timeout, create-on-issue, followup, halt, auth, recover, adapter)")
+    print(
+        "PASS: hermes_conductor T1-T12 "
+        "(early live, timeout, create-on-issue, followup, halt, auth, recover, adapter, real brief)"
+    )
     return 0
 
 

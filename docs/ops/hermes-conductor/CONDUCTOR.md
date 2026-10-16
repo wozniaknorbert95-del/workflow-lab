@@ -2,9 +2,11 @@
 
 Obowiązkowa. Pominięcie narzędzia D = nie wolno ogłosić PASS.
 
-1. **Zczytaj** Linear: 6 pól, lista AC (checkbox / numerowane), etykiety, `repo`. DoR dziurawe → refuse, nie startuj Cursora.
-2. **Brief** dla Cloud API: AC, DoD ids z kanonu których plików issue dotyczy, zakazy (zero deploy/SSH/sekretów), `work_mode` (`buduj` | `testuj` | `ulepszaj`).
-3. **Sesja:** utwórz albo follow-up na **tym samym** `agentId`. Zapisz `run_url` do `hermes-conductor-live.json`.
+1. **Zczytaj** Linear: 6 pól, lista AC (checkbox / numerowane), etykiety, `repo`. DoR dziurawe → refuse, nie startuj Cursora. Handoff: `url`, `ac[]`, `dor_excerpts` (sanitized), `brief_kind`.
+2. **Brief** dla Cloud API:
+   - `brief_kind=real` (default): repo z handoff + AC/DoR excerpts + playbook `.cursor/commands/autopilot.md` + `work_mode`. **Nie** szablon `conductor-lab-probe.md`.
+   - `brief_kind=lab_probe` (smoke QUI-129/130/131, label `lab-smoke`, albo `OPS_CONDUCTOR_LAB_PROBE=1` / `CONDUCTOR_LAB_PROBE_ISSUES`): slice probe w `workflow-lab`.
+3. **Sesja:** utwórz albo follow-up na **tym samym** `agentId`. Follow-up = steer (domknij FAIL AC), nie powtórka probe. Zapisz `run_url` do `hermes-conductor-live.json`.
 4. **Strumień:** tool_call → `live.tests[]` (cmd, excerpt, PASS|FAIL|UNKNOWN). Puste w RUNNING = UNKNOWN testów.
 5. **Narzędzie D** (mandatory): DoR, każdy punkt AC, required checks, dirty PR, R7/HITL. FAIL D → follow-up (limit `OPS_CONDUCTOR_MAX_FOLLOWUPS`) albo HITL. J (treść AC / UX) **tylko po** D.
 6. **Raport** `live.conductor.report_pl`: zrobione · do laptopa · padło · następny pin. Tryb `ulepszaj` = jeden draft issue, zero kodu. Tryb `testuj` = nie merge.
