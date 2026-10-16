@@ -51,9 +51,12 @@ fi
 install -m 644 "$TARGET/docs/ops/hermes-ops.service.example" /etc/systemd/system/hermes-ops.service
 install -m 644 "$TARGET/docs/ops/hermes-ops.timer.example" /etc/systemd/system/hermes-ops.timer
 install -m 644 "$TARGET/docs/ops/hermes-ops-cmd.path.example" /etc/systemd/system/hermes-ops-cmd.path
+install -m 644 "$TARGET/docs/ops/hermes-ops-conductor.path.example" /etc/systemd/system/hermes-ops-conductor.path
 sed -i "s|/opt/workflow-lab|$TARGET|g" /etc/systemd/system/hermes-ops.service
 # Phone POST /ops/run writes ops-cmd.json (bind-mount). Path unit kicks tick immediately
 # — vault runs in Docker and cannot systemctl the host.
+# Nous writes hermes-conductor-live.json with https run_url; conductor path kicks tick
+# so ops-status gets URL within ~30s (not wait for 5min timer).
 # Docker bind-mount trap: ops-cmd.json can become an empty directory.
 if [[ -d "$AKADEMIA_DATA/ops-cmd.json" ]]; then
   rmdir "$AKADEMIA_DATA/ops-cmd.json" 2>/dev/null || rm -rf "$AKADEMIA_DATA/ops-cmd.json"
@@ -61,10 +64,14 @@ if [[ -d "$AKADEMIA_DATA/ops-cmd.json" ]]; then
 fi
 touch "$AKADEMIA_DATA/ops-cmd.json" 2>/dev/null || true
 chmod 664 "$AKADEMIA_DATA/ops-cmd.json" 2>/dev/null || true
+# Force MakeDirectory=false on both path units (cmd.example historically true).
+sed -i 's/^MakeDirectory=.*/MakeDirectory=false/' /etc/systemd/system/hermes-ops-cmd.path
+sed -i 's/^MakeDirectory=.*/MakeDirectory=false/' /etc/systemd/system/hermes-ops-conductor.path
 systemctl daemon-reload
-systemctl enable hermes-ops.timer hermes-ops-cmd.path
+systemctl enable hermes-ops.timer hermes-ops-cmd.path hermes-ops-conductor.path
 systemctl restart hermes-ops.timer
 systemctl restart hermes-ops-cmd.path
+systemctl restart hermes-ops-conductor.path
 systemctl start hermes-ops.service || true
 
 if [[ "$KEEP_PHONE_LOOP" == "1" ]]; then
@@ -74,7 +81,7 @@ else
   echo "INFO: hermes-phone-loop.timer wyłączony (KEEP_PHONE_LOOP=0)."
 fi
 
-echo "OK: hermes-ops.timer + hermes-ops-cmd.path → $AKADEMIA_DATA/ops-status.json"
+echo "OK: hermes-ops.timer + hermes-ops-cmd.path + hermes-ops-conductor.path → $AKADEMIA_DATA/ops-status.json"
 grep -q '^LINEAR_OPS_QUEUE_FILE=' "$ENV_FILE" || printf '\nLINEAR_OPS_QUEUE_FILE=%s/linear-queue.json\n' "$TARGET/data" >>"$ENV_FILE"
 chmod 600 "$ENV_FILE"
 if ! grep -q '^LINEAR_OPS_READ=.\+' "$ENV_FILE"; then
