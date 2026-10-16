@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 from typing import Any, Callable
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -10,6 +11,14 @@ from urllib.request import Request, urlopen
 API = "https://api.cursor.com/v1/agents"
 
 Fetch = Callable[[str, str, dict[str, Any] | None], dict[str, Any]]
+
+
+def create_timeout_sec() -> int:
+    try:
+        n = int(os.environ.get("CONDUCTOR_CREATE_TIMEOUT_SEC") or "25")
+    except (TypeError, ValueError):
+        n = 25
+    return n if n > 0 else 25
 
 
 def _auth_header(key: str) -> str:
@@ -68,7 +77,16 @@ def default_fetch(
         if not body:
             body = {"error": raw[:200]}
         return {"ok": False, "code": int(exc.code), "body": body}
-    except (URLError, TimeoutError, json.JSONDecodeError) as exc:
+    except TimeoutError as exc:
+        return {"ok": False, "code": 0, "body": {"error": f"timeout:{exc}"[:120], "timeout": True}}
+    except URLError as exc:
+        reason = str(getattr(exc, "reason", exc) or exc)
+        timed_out = "timed out" in reason.lower() or "timeout" in reason.lower()
+        body: dict[str, Any] = {"error": reason[:120]}
+        if timed_out:
+            body["timeout"] = True
+        return {"ok": False, "code": 0, "body": body}
+    except json.JSONDecodeError as exc:
         return {"ok": False, "code": 0, "body": {"error": str(exc)[:120]}}
 
 
@@ -100,10 +118,8 @@ class CloudClient:
                 "repos": [{"url": repo, "startingRef": "main"}],
                 "autoCreatePR": bool(auto_pr),
             },
+            timeout=create_timeout_sec(),
         )
-
-    def followup(self, agent_id: str, prompt: str) -> dict[str, Any]:
-        return self.call("POST", f"/{agent_id}/followup", {"prompt": {"text": prompt[:20000]}})
 
     def followup_run(self, agent_id: str, prompt: str) -> dict[str, Any]:
         return self.call("POST", f"/{agent_id}/runs", {"prompt": {"text": prompt[:20000]}})
@@ -122,6 +138,9 @@ class CloudClient:
     def unarchive(self, agent_id: str) -> dict[str, Any]:
         return self.call("POST", f"/{agent_id}/unarchive", {})
 
+    def list_agents(self, *, limit: int = 50) -> dict[str, Any]:
+        return self.call("GET", f"?limit={int(limit)}", None, timeout=20)
+
 
 def busy_or_error(resp: dict[str, Any]) -> str:
     if resp.get("ok"):
@@ -131,9 +150,13 @@ def busy_or_error(resp: dict[str, Any]) -> str:
     err = str(body.get("error") or body.get("message") or "").lower()
     if code == 409 or "agent_busy" in err:
         return "cursor_api_busy"
-    if code in (401, 403) and "key" in err:
+    if code in (401, 403):
+        return "cursor_api_auth"
+    if body.get("timeout") or err.startswith("timeout") or "timed out" in err:
+        return "conductor_timeout"
+    if "key" in err and code == 0:
         return "missing_CURSOR_API_KEY"
-    return "conductor_timeout"
+    return "cursor_api_error"
 
 
 def extract_ids(resp: dict[str, Any]) -> tuple[str, str, str]:
@@ -143,6 +166,45 @@ def extract_ids(resp: dict[str, Any]) -> tuple[str, str, str]:
     agent_id = str(agent.get("id") or body.get("id") or "")[:80]
     run_id = str(run.get("id") or body.get("run_id") or agent.get("latestRunId") or "")[:80]
     url = str(agent.get("url") or body.get("url") or "")[:500]
+    if agent_id and not url:
+        url = f"https://cursor.com/agents/{agent_id}"
+    return agent_id, run_id, url
+
+
+def agents_from_list(resp: dict[str, Any]) -> list[dict[str, Any]]:
+    body = resp.get("body") if isinstance(resp.get("body"), dict) else {}
+    raw = body.get("agents") or body.get("items") or body.get("data") or []
+    if isinstance(body, list):
+        raw = body
+    return [a for a in raw if isinstance(a, dict)]
+
+
+def recover_agent_by_name(cli: "CloudClient", name_prefix: str) -> tuple[str, str, str]:
+    """Best-effort: find newest agent matching name; archive older duplicates."""
+    resp = cli.list_agents(limit=50)
+    if not resp.get("ok"):
+        return "", "", ""
+    want = (name_prefix or "").strip().lower()
+    matches: list[dict[str, Any]] = []
+    for agent in agents_from_list(resp):
+        name = str(agent.get("name") or "").lower()
+        if want and want not in name:
+            continue
+        matches.append(agent)
+    if not matches:
+        return "", "", ""
+    matches.sort(key=lambda a: str(a.get("createdAt") or a.get("updatedAt") or a.get("id") or ""), reverse=True)
+    newest = matches[0]
+    for older in matches[1:]:
+        oid = str(older.get("id") or "")
+        if oid:
+            try:
+                cli.archive(oid)
+            except Exception:
+                pass
+    agent_id = str(newest.get("id") or "")[:80]
+    run_id = str(newest.get("latestRunId") or "")[:80]
+    url = str(newest.get("url") or "")[:500]
     if agent_id and not url:
         url = f"https://cursor.com/agents/{agent_id}"
     return agent_id, run_id, url

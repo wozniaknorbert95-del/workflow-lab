@@ -1,16 +1,16 @@
 """Conductor loop: handoff → Cloud API → live JSON. Not the tick."""
 from __future__ import annotations
 
+import time
 from typing import Any
 
-from hermes_conductor.cloud import CloudClient, busy_or_error, extract_ids, tests_from_stream
-
-
-def _tests(cli: CloudClient, agent_id: str, run_id: str) -> list[dict[str, str]]:
-    try:
-        return tests_from_stream(cli.stream(agent_id, run_id))
-    except Exception:
-        return []
+from hermes_conductor.cloud import (
+    CloudClient,
+    busy_or_error,
+    extract_ids,
+    recover_agent_by_name,
+    tests_from_stream,
+)
 from hermes_conductor.io import (
     cursor_key,
     halt_requested,
@@ -24,6 +24,13 @@ from hermes_conductor.io import (
     work_mode,
     write_json,
 )
+
+
+def _tests(cli: CloudClient, agent_id: str, run_id: str) -> list[dict[str, str]]:
+    try:
+        return tests_from_stream(cli.stream(agent_id, run_id))
+    except Exception:
+        return []
 
 
 def _brief(handoff: dict[str, Any], *, fail_ac: bool = False) -> str:
@@ -46,6 +53,20 @@ def _brief(handoff: dict[str, Any], *, fail_ac: bool = False) -> str:
     )
 
 
+def _agent_fields(prev: dict[str, Any]) -> tuple[str, str, str]:
+    agent = prev.get("agent") if isinstance(prev.get("agent"), dict) else {}
+    agent_id = str(agent.get("agent_id") or prev.get("agent_id") or "")
+    run_id = str(agent.get("run_id") or "")
+    # Legacy: older live stored agent_id inside run_id.
+    if not agent_id and run_id.startswith("bc-"):
+        agent_id = run_id
+        run_id = ""
+    if not agent_id:
+        agent_id = str(prev.get("agent_id") or "")
+    run_url = str(agent.get("run_url") or "")
+    return agent_id, run_id, run_url
+
+
 def _live(
     handoff: dict[str, Any],
     *,
@@ -58,6 +79,8 @@ def _live(
     ac: list[dict[str, str]] | None = None,
     report: str = "",
     halted: bool = False,
+    create_ms: int | None = None,
+    http_code: int | None = None,
 ) -> dict[str, Any]:
     mode = work_mode(handoff.get("work_mode"))
     issue = str(handoff.get("issue_id") or "")
@@ -69,7 +92,8 @@ def _live(
         "agent": {
             "provider": "cursor-cloud" if run_url else "",
             "run_url": run_url,
-            "run_id": agent_id or run_id,
+            "agent_id": agent_id,
+            "run_id": run_id,
             "model": "",
         },
         "tests": tests or [],
@@ -84,12 +108,21 @@ def _live(
             "report_pl": report,
         },
     }
+    if create_ms is not None:
+        blob["create_ms"] = int(create_ms)
+    if http_code is not None:
+        blob["http"] = int(http_code)
     if refuse:
         blob["refuse"] = refuse
         blob["error"] = refuse
     if halted:
         blob["halted"] = True
     return blob
+
+
+def _ac_fail(prev: dict[str, Any]) -> bool:
+    ac = list((prev.get("conductor") or {}).get("ac") or [])
+    return any(str(x.get("verdict")) == "FAIL" for x in ac if isinstance(x, dict))
 
 
 def step(
@@ -107,12 +140,11 @@ def step(
 
     issue = str(handoff.get("issue_id") or "")
     prev = live if isinstance(live, dict) else {}
-    agent_id = str((prev.get("agent") or {}).get("run_id") or prev.get("agent_id") or "")
-    run_id = str((prev.get("agent") or {}).get("run_id") or "")
-    run_url = str((prev.get("agent") or {}).get("run_url") or "")
+    agent_id, run_id, run_url = _agent_fields(prev)
     followups = int((prev.get("conductor") or {}).get("followups_used") or prev.get("followups") or 0)
     cmd_id = str(handoff.get("cmd_id") or "")
-    same_cmd = cmd_id and cmd_id == str(prev.get("cmd_id") or "")
+    same_cmd = bool(cmd_id and cmd_id == str(prev.get("cmd_id") or ""))
+    same_issue = bool(issue and issue == str(prev.get("issue") or prev.get("issue_id") or ""))
 
     if halt_requested(ops) and agent_id and not prev.get("halted"):
         cli = client or CloudClient(key)
@@ -123,7 +155,7 @@ def step(
             handoff,
             agent_id=agent_id,
             run_id=run_id,
-            run_url=run_url,
+            run_url="",
             followups=followups,
             report="Take over / Pause — sesja zarchiwizowana. Zero follow-up.",
             halted=True,
@@ -141,9 +173,9 @@ def step(
     mode = work_mode(handoff.get("work_mode"))
     auto_pr = mode == "buduj"
 
-    if agent_id and same_cmd and run_url:
-        ac = list((prev.get("conductor") or {}).get("ac") or [])
-        if any(str(x.get("verdict")) == "FAIL" for x in ac if isinstance(x, dict)):
+    # Same session: follow-up only on AC FAIL with budget left.
+    if agent_id and same_cmd and same_issue and run_url:
+        if _ac_fail(prev):
             if followups >= max_followups():
                 blob = dict(prev)
                 blob["refuse"] = "qui_hitl"
@@ -159,6 +191,7 @@ def step(
                     run_url=run_url,
                     followups=followups,
                     refuse=why,
+                    http_code=int(resp.get("code") or 0),
                     report=f"Follow-up padł: {why}.",
                 )
                 return {"ok": False, "state": "refuse", "wrote": True, "live": blob}
@@ -168,71 +201,116 @@ def step(
             blob = _live(
                 handoff,
                 agent_id=use_id,
-                run_id=new_run or use_id,
+                run_id=new_run or run_id,
                 run_url=new_url or run_url,
                 tests=tests,
                 followups=followups + 1,
                 ac=[{"id": "AC-1", "verdict": "PASS"}],
+                http_code=int(resp.get("code") or 200),
                 report="Zrobione: follow-up na tej samej sesji. Do laptopa: deploy. Padło: nic.",
             )
             return {"ok": True, "state": "followup", "wrote": True, "live": blob}
+        # Enrich tests after early-create write (stream on next tick).
+        prev_tests = list(prev.get("tests") or [])
+        ac = list((prev.get("conductor") or {}).get("ac") or [])
+        if not prev_tests and (not ac or str(ac[0].get("verdict")) == "UNKNOWN"):
+            tests = _tests(cli, agent_id, run_id)
+            if tests:
+                verdict = "PASS" if all(t.get("verdict") != "FAIL" for t in tests) else "FAIL"
+                blob = _live(
+                    handoff,
+                    agent_id=agent_id,
+                    run_id=run_id,
+                    run_url=run_url,
+                    tests=tests,
+                    followups=followups,
+                    ac=[{"id": "AC-1", "verdict": verdict}],
+                    report="Zrobione: sesja Cloud API. Do laptopa: deploy. Padło: nic.",
+                )
+                return {"ok": True, "state": "enriched", "wrote": True, "live": blob}
         return {"ok": True, "state": "unchanged", "wrote": False, "live": prev}
 
-    if agent_id and not same_cmd:
-        cli.unarchive(agent_id)
-        resp = cli.followup_run(agent_id, _brief(handoff))
-        if not resp.get("ok"):
-            why = busy_or_error(resp)
-            blob = _live(handoff, agent_id=agent_id, run_url=run_url, refuse=why, followups=followups)
-            return {"ok": False, "state": "refuse", "wrote": True, "live": blob}
-        new_id, new_run, new_url = extract_ids(resp)
-        use_id = new_id or agent_id
-        tests = _tests(cli, use_id, new_run or "")
-        blob = _live(
-            handoff,
-            agent_id=use_id,
-            run_id=new_run or use_id,
-            run_url=new_url or f"https://cursor.com/agents/{use_id}",
-            tests=tests,
-            followups=followups + 1,
-            ac=[{"id": "AC-1", "verdict": "PASS"}],
-            report="Zrobione: follow-up. Do laptopa: deploy. Padło: nic.",
-        )
-        return {"ok": True, "state": "followup", "wrote": True, "live": blob}
+    # New cmd_id and/or new issue → create (never followup-on-corpse).
+    if agent_id and (not same_cmd or not same_issue):
+        try:
+            cli.archive(agent_id)
+        except Exception:
+            pass
 
+    t0 = time.monotonic()
     resp = cli.create(
         _brief(handoff, fail_ac=fail_first),
         repo_url(str(handoff.get("repo") or "workflow-lab")),
         auto_pr=auto_pr,
         name=f"{issue} conductor"[:100],
     )
+    create_ms = int((time.monotonic() - t0) * 1000)
     if not resp.get("ok"):
         why = busy_or_error(resp)
-        blob = _live(handoff, refuse=why, report=f"Create padł: {why}.")
-        return {"ok": False, "state": "refuse", "wrote": True, "live": blob}
+        if why == "conductor_timeout":
+            rec_id, rec_run, rec_url = recover_agent_by_name(cli, f"{issue} conductor")
+            if rec_id and rec_url:
+                blob = _live(
+                    handoff,
+                    agent_id=rec_id,
+                    run_id=rec_run,
+                    run_url=rec_url,
+                    followups=0,
+                    create_ms=create_ms,
+                    http_code=int(resp.get("code") or 0),
+                    ac=[{"id": "AC-1", "verdict": "UNKNOWN"}],
+                    report="Recover: create timeout, live z listy agents.",
+                )
+                return {
+                    "ok": True,
+                    "state": "created",
+                    "wrote": True,
+                    "live": blob,
+                    "create_ms": create_ms,
+                    "http": int(resp.get("code") or 0),
+                }
+        blob = _live(
+            handoff,
+            refuse=why,
+            create_ms=create_ms,
+            http_code=int(resp.get("code") or 0),
+            report=f"Create padł: {why}.",
+        )
+        return {
+            "ok": False,
+            "state": "refuse",
+            "wrote": True,
+            "live": blob,
+            "create_ms": create_ms,
+            "http": int(resp.get("code") or 0),
+        }
+
     agent_id, run_id, run_url = extract_ids(resp)
-    tests = _tests(cli, agent_id, run_id)
-    ac_verdict = "FAIL" if fail_first else "UNKNOWN"
-    if tests and not fail_first:
-        ac_verdict = "PASS" if all(t.get("verdict") != "FAIL" for t in tests) else "FAIL"
-    if fail_first:
-        ac_verdict = "FAIL"
+    # Early live: return URL immediately — stream/tests on next same_cmd tick.
     report = (
         "Padło: AC-1 (probe). Do laptopa: nic. Następny: follow-up na tej samej sesji."
         if fail_first
-        else "Zrobione: sesja Cloud API. Do laptopa: deploy. Padło: nic."
+        else "Sesja Cloud utworzona — stream w kolejnym ticku."
     )
     blob = _live(
         handoff,
         agent_id=agent_id,
-        run_id=run_id or agent_id,
+        run_id=run_id,
         run_url=run_url,
-        tests=tests,
         followups=0,
-        ac=[{"id": "AC-1", "verdict": ac_verdict}],
+        create_ms=create_ms,
+        http_code=int(resp.get("code") or 200),
+        ac=[{"id": "AC-1", "verdict": "FAIL" if fail_first else "UNKNOWN"}],
         report=report,
     )
-    return {"ok": True, "state": "created", "wrote": True, "live": blob}
+    return {
+        "ok": True,
+        "state": "created",
+        "wrote": True,
+        "live": blob,
+        "create_ms": create_ms,
+        "http": int(resp.get("code") or 200),
+    }
 
 
 def run_once(*, fail_first: bool = False) -> dict[str, Any]:
@@ -240,7 +318,17 @@ def run_once(*, fail_first: bool = False) -> dict[str, Any]:
     live = read_json(status_path())
     ops = read_json(ops_status_path())
     key = cursor_key()
-    result = step(handoff=handoff, live=live, ops=ops, key=key, fail_first=fail_first)
+    try:
+        result = step(handoff=handoff, live=live, ops=ops, key=key, fail_first=fail_first)
+    except Exception as exc:
+        issue_handoff = handoff if isinstance(handoff, dict) else {"issue_id": "", "cmd_id": ""}
+        blob = _live(
+            issue_handoff,
+            refuse="conductor_timeout",
+            report=f"Conductor exception: {type(exc).__name__}.",
+        )
+        write_json(status_path(), blob)
+        return {"ok": False, "state": "refuse", "wrote": True, "live": blob, "error": type(exc).__name__}
     if result.get("wrote") and isinstance(result.get("live"), dict):
         write_json(status_path(), result["live"])
     return result
