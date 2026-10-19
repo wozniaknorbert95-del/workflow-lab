@@ -461,6 +461,23 @@ def main() -> int:
                 errors.append(f"platform {label} missing NEVER draft")
             if "/autopilot" not in blob:
                 errors.append(f"platform {label} missing /autopilot")
+            # QUI-153: ISSUE-JSON v1 + exact preflight + /start, no gitignored context-state.
+            if "ISSUE-JSON v1" not in blob or '"id": "QUI-92"' not in blob:
+                errors.append(f"platform {label} missing ISSUE-JSON v1")
+            if "session-preflight.py QUI-92 --issue-json tmp/issue-QUI-92.json" not in blob:
+                errors.append(f"platform {label} missing preflight --issue-json")
+            if "/start" not in blob or "### Stan sesji" not in blob:
+                errors.append(f"platform {label} missing /start + Stan sesji")
+            if "context-state" in blob or "/scope-lock" in blob or "/resume" in blob:
+                errors.append(f"platform {label} must not reference context-state / scope-lock / resume")
+            if "STOP wins over AC" not in blob:
+                errors.append(f"platform {label} missing STOP wins over AC")
+        with_json, _ = cursor_wake_bodies(
+            "dsaas-platform-main",
+            {"id": "QUI-93", "issue_json": {"v": 1, "id": "QUI-93", "estimate": 2, "labels": ["agent"]}},
+        )
+        if '"estimate": 2' not in with_json:
+            errors.append("platform wake must reuse provided issue_json")
         lab_issue, lab_comment = cursor_wake_bodies("workflow-lab", {"id": "QUI-ZZ"})
         if "session-preflight" in lab_issue or "session-preflight" in lab_comment:
             errors.append("lab wake must not instruct dsaas preflight")

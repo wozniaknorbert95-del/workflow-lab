@@ -11,6 +11,7 @@ from hermes_conductor.cloud import (
     recover_agent_by_name,
     tests_from_stream,
 )
+from hermes_ops.issue_brief import build_issue_json, issue_json_block
 from hermes_conductor.io import (
     cursor_key,
     halt_requested,
@@ -24,6 +25,9 @@ from hermes_conductor.io import (
     work_mode,
     write_json,
 )
+
+
+PLATFORM_REPO = "dsaas-platform-main"
 
 
 def _tests(cli: CloudClient, agent_id: str, run_id: str) -> list[dict[str, str]]:
@@ -77,6 +81,21 @@ def _dor_block(handoff: dict[str, Any]) -> str:
     return "\n\n".join(lines)
 
 
+def _issue_json(handoff: dict[str, Any]) -> dict[str, Any]:
+    """Handoff ISSUE-JSON v1; a pre-QUI-153 handoff gets a bare one (preflight → STOP-LINEAR)."""
+    blob = handoff.get("issue_json")
+    if isinstance(blob, dict) and blob.get("id"):
+        return blob
+    return build_issue_json(
+        {
+            "id": handoff.get("issue_id"),
+            "title": handoff.get("title"),
+            "labels": handoff.get("labels") or [],
+            "repo": handoff.get("repo"),
+        }
+    )
+
+
 def _brief(handoff: dict[str, Any], *, fail_ac: bool = False, steer: bool = False) -> str:
     issue = str(handoff.get("issue_id") or "")
     title = str(handoff.get("title") or "")
@@ -123,14 +142,17 @@ def _brief(handoff: dict[str, Any], *, fail_ac: bool = False, steer: bool = Fals
         )
     playbook = (
         "Playbook: wykonaj kontrakt `.cursor/commands/autopilot.md` w tym repo "
-        "(scope-lock → plan → kod 1 atom → gate → verify → evidence → handoff; max 3 atomy). "
-        "Nie kończ po samym odczytaniu promptu — domknij AC albo jawny FAIL/HITL."
+        "(preflight → plan → kod 1 atom → gate → verify → evidence → Stan sesji w PR; max 3 atomy). "
+        "Nie kończ po samym odczytaniu promptu — domknij AC albo jawny FAIL/HITL/STOP."
     )
     if repo != "dsaas-platform-main":
         playbook += (
             " Jeśli brak `.cursor/commands/autopilot.md`, stosuj ten sam łańcuch "
             "(plan → implement → test → PR) i nie wymyślaj deployu."
         )
+    issue_part = ""
+    if repo == PLATFORM_REPO:
+        issue_part = "\n\n" + issue_json_block(_issue_json(handoff))
     return (
         f"QuietForge Hermes conductor (real Autopilot). Issue {issue}: {title}.\n"
         f"Linear: {url}\n"
@@ -139,6 +161,7 @@ def _brief(handoff: dict[str, Any], *, fail_ac: bool = False, steer: bool = Fals
         f"{_mode_rules(mode)}\n"
         f"{playbook}\n"
         f"AC do domknięcia:\n{ac_block}"
+        f"{issue_part}"
         f"{dor_part}"
         f"{steer_part}"
     )

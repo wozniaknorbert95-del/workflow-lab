@@ -7,6 +7,7 @@ import urllib.error
 import urllib.request
 from typing import Any, Callable
 
+from .issue_brief import build_issue_json, enrich_issue, issue_json_block
 from .policy import ALLOWED_REPOS, allow_deploy, allow_merge, has_workflow_dispatch_deploy
 
 GITHUB_API = os.environ.get("GITHUB_API", "https://api.github.com")
@@ -27,18 +28,27 @@ def cursor_wake_bodies(repo: str, issue: dict[str, Any]) -> tuple[str, str]:
     linear_id = str(issue.get("id") or issue.get("identifier") or "").strip() or "?"
     url = str(issue.get("url") or "")
     if repo == PLATFORM_REPO:
+        issue_json = issue.get("issue_json") if isinstance(issue.get("issue_json"), dict) else None
+        if not issue_json:
+            issue_json = enrich_issue({**issue, "repo": repo}).get("issue_json") or build_issue_json(
+                {**issue, "repo": repo}
+            )
         bootstrap = (
             "SESSION BOOTSTRAP (dsaas-platform-main):\n"
             "1. Read AGENTS.md, then `.cursor/README.md`.\n"
-            f"2. Run `python scripts/session-preflight.py {linear_id}` (read-only).\n"
-            "3. LANE=UNKNOWN or STOP = do not implement. UNKNOWN is not PASS.\n"
+            f"2. Save the ISSUE-JSON v1 block below to `tmp/issue-{linear_id}.json`, then run "
+            f"`python scripts/session-preflight.py {linear_id} --issue-json tmp/issue-{linear_id}.json` (read-only).\n"
+            "3. LANE=UNKNOWN / LOCAL / BLOCKED or STOP = do not implement: reply STOP-LINEAR with the preflight output "
+            "in this turn. UNKNOWN is not PASS. STOP wins over AC.\n"
             "4. One issue, feature branch ≠ main. Do not mix dirty worktrees.\n"
             "5. Never: deploy, SSH, secrets, workflow_dispatch, production GO.\n"
             "6. Stay in this repo. Do not retarget workflow-lab.\n"
             f"7. {NEVER_DRAFT_LINE}\n"
             "8. Unattended procedure: `/autopilot <id>` (max 3 atoms; gate FAIL → 1 retry; 2× BLOCKED → `/park`).\n"
-            "9. Before code: `/scope-lock` then `/scope-look`. Host change → `/env`. Pause/Take over → `/resume` (read `.cursor/context-state.md`).\n"
-            "10. Do not invent `/deploy`, `/publish`, `/skip-gate`, `/force-merge`. Laptop HITL: `/deployready` then wait for Commander GO.\n"
+            "9. Before code: `/start`. Take over: read `### Stan sesji` in the open PR body first. "
+            "Pause: `/checkpoint` writes `### Stan sesji` to the PR body.\n"
+            "10. Do not invent `/deploy`, `/publish`, `/skip-gate`, `/force-merge`. Laptop HITL: `/deployready` then wait for Commander GO.\n\n"
+            f"{issue_json_block(issue_json)}\n"
         )
     else:
         bootstrap = (

@@ -1,0 +1,17 @@
+{
+ "id": "QUI-147",
+ "title": "[OPS] Faza 2 · Warsztat Cursora 2/3: chudy rdzeń instrukcji + stan sesji + jeden EV na PR",
+ "status": "Done",
+ "labels": [
+  "value:time-saving",
+  "work:tech-debt",
+  "area:workflow",
+  "agent"
+ ],
+ "estimate": 3,
+ "project": "dsaas-platform-main",
+ "description": "> **Blok metadanych** (wzorzec: QUI-39, `docs/ops/LINEAR-PLATFORM.md` §0.1)\n>\n> * **Severity:** P2 · **NC:** NC-3 · **Fala:** QF-LIVE-OPS · **Estimate:** 3\n> * **Stan:** DONE · PR/EV: dsaas-platform-main#203\n> * **DoR:** READY (komplet 6 pól + estimate + kryteria akceptacji + etykieta agent)\n> * **Owner (RACI):** R5 wykonawca (agent Cursor) · R1 arbitraż · R7 bramka bezpieczeństwa · Dowódca = human-stop\n> * **Zakres środowiska:** repo (Zasada 11): tylko pliki w repozytorium i CI; zero zmian na serwerach i w produkcji\n\n## 0. Pomiar przed\n\n* Pomiar bazowy F0 (liczby w Linear). Ta sekcja NIE trafia do ISSUE-JSON.\n\n## 1. Cel biznesowy\n\nAgent szybciej łapie zadanie; Stan sesji przechodzi między Hermesem a laptopem.\n\n## 4. Kryteria akceptacji\n\n- [X] Instrukcje always-on ≤2 500 tokenów. *(dowód: https://github.com/wozniaknorbert95-del/dsaas-platform-main/pull/203)*\n- [X] `close-atom.py`: jeden wpis EV na PR, tylko dopisanie.\n- [ ] Benchmark B4 i B7: PASS (pass^3).\n- [X] `docs/ops/KONTRAKT-CURSOR-HERMES.md` istnieje. Ścieżki K1–K4 bez zmian (test).\n\n```bash\npython -m pytest -q tests/test_close_atom.py\n```\n\n## 7. Weryfikacja (komendy)\n\n`npm run lint` · `npm test`\n\n## 8. Rollback\n\n`git revert` commita scalającego PR. Stare wpisy EV i `todo.json` nie są przepisywane (tylko dopisujemy), więc revert jest bezpieczny.\n\n## 9. Ograniczenia\n\nNie przemianowujemy `.cursor/commands/autopilot.md`, `/scope-lock`, `/resume` (kontrakt Hermesa).\n\n## 11. Dziennik wykonania\n\n(uzupełnia wykonawca)\n",
+ "repo": "dsaas-platform-main",
+ "url": "https://linear.app/quietforge/issue/QUI-147",
+ "_note": "Fixture QUI-153: skrócony kształt opisu QUI-147 z Linear (2026-10-19): blok metadanych, AC, rollback + sekcje, których skrót DoR nie może przenieść. Repo publiczne — bez treści wewnętrznych."
+}

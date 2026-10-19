@@ -12,8 +12,120 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from hermes_conductor.cloud import CloudClient, _parse_body, busy_or_error
 from hermes_conductor.loop import _brief, step
 from hermes_ops.conductor_adapter import merge_conductor_into_live, write_handoff
-from hermes_ops.issue_brief import extract_ac_list, extract_dor_excerpts, resolve_brief_kind
+from hermes_ops.issue_brief import (
+    build_issue_json,
+    extract_ac_list,
+    extract_dor_excerpts,
+    resolve_brief_kind,
+)
 
+
+
+def _fold(text: str) -> str:
+    import unicodedata
+
+    low = unicodedata.normalize("NFKD", str(text or "").lower())
+    return "".join(c for c in low if not unicodedata.combining(c)).replace("ł", "l")
+
+
+def _preflight_dor_missing(ij: dict[str, Any]) -> list[str]:
+    """Mirror of dsaas-platform-main check-linear-contract._missing_dor (2026-10-19)."""
+    import re
+
+    text = " ".join(str(ij.get(k, "")) for k in ("title", "body", "description"))
+    norm = _fold(text)
+    labels = [str(x).lower() for x in ij.get("labels") or []]
+    miss: list[str] = []
+    if not ij.get("estimate"):
+        miss.append("estimate")
+    if not ("kryteria akceptacji" in norm or "acceptance" in norm or "- [ ]" in text):
+        miss.append("ac")
+    if "agent" not in labels:
+        miss.append("agent")
+    if "severity" not in norm and not any(p in norm for p in ("p0", "p1", "p2", "p3")):
+        miss.append("severity")
+    if "nc-" not in norm:
+        miss.append("nc")
+    if "fala" not in norm:
+        miss.append("fala")
+    if "owner" not in norm and "raci" not in norm:
+        miss.append("owner")
+    if "zakres srodowiska" not in norm and "zasada 11" not in norm:
+        miss.append("zakres")
+    rb = re.search(r"(?im)^#+\s*rollback\s*$\n+\s*\S", text) or re.search(r"(?im)rollback\s*:\s*\S", text)
+    if not rb:
+        miss.append("rollback")
+    return miss
+
+
+def _t13_issue_json() -> list[str]:
+    import json
+    import tempfile
+
+    errors: list[str] = []
+    fx = json.loads((ROOT / "scripts" / "fixtures" / "qui147-issue.json").read_text(encoding="utf-8"))
+    issue = {k: fx[k] for k in ("id", "title", "status", "labels", "estimate", "project", "repo", "url")}
+    issue["status"] = "Ready"
+    ij = build_issue_json(issue, fx["description"])
+    if ij.get("v") != 1 or ij.get("id") != "QUI-147":
+        errors.append(f"T13 issue_json header, got v={ij.get('v')} id={ij.get('id')}")
+    if ij.get("estimate") != 3 or "agent" not in ij.get("labels", []):
+        errors.append(f"T13 estimate/labels, got {ij.get('estimate')} {ij.get('labels')}")
+    miss = _preflight_dor_missing(ij)
+    if miss:
+        errors.append(f"T13 QUI-147 ISSUE-JSON must pass platform DoR, missing={miss}")
+    desc = ij.get("description") or ""
+    if len(desc) > 2500 or "http" in desc or "```" in desc:
+        errors.append(f"T13 description must be bounded and sanitized, len={len(desc)}")
+    if "Pomiar przed" in desc or "Dziennik" in desc:
+        errors.append("T13 description must be a DoR digest, not the raw description")
+
+    # B6a: issue without data → JSON still emitted, preflight would STOP (fail-closed).
+    bare = build_issue_json({"id": "qui-999", "title": "bez danych", "labels": []}, "")
+    if bare.get("id") != "QUI-999" or bare.get("estimate") is not None or bare.get("description"):
+        errors.append(f"T13 bare issue_json must stay empty, got {bare}")
+    if "estimate" not in _preflight_dor_missing(bare):
+        errors.append("T13 bare issue_json must fail DoR (B6a)")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        hd = Path(tmp) / "handoff.json"
+        write_handoff({**issue, "description": fx["description"]}, work_mode="testuj", cmd_id="c13", path=hd, fetch_linear=False)
+        ho = json.loads(hd.read_text(encoding="utf-8"))
+    if "description" in ho:
+        errors.append("T13 handoff must not persist raw description")
+    if (ho.get("issue_json") or {}).get("id") != "QUI-147":
+        errors.append(f"T13 handoff must carry issue_json, got {ho.get('issue_json')}")
+    text = _brief(ho)
+    if "ISSUE-JSON v1" not in text:
+        errors.append("T13 platform brief must carry ISSUE-JSON v1")
+    if "--issue-json tmp/issue-QUI-147.json" not in text or "tmp/issue-QUI-147.json" not in text:
+        errors.append("T13 brief must give the exact preflight command")
+    start = text.find("```json\n")
+    end = text.find("\n```", start + 8)
+    try:
+        parsed = json.loads(text[start + 8 : end])
+    except (ValueError, TypeError):
+        parsed = {}
+    if parsed != ho["issue_json"]:
+        errors.append("T13 JSON in brief must parse and equal handoff issue_json")
+    if "/start" not in text or "### Stan sesji" not in text:
+        errors.append("T13 brief must use /start + ### Stan sesji")
+    if "STOP ma pierwszeństwo przed AC" not in text:
+        errors.append("T13 brief must say STOP wins over AC")
+    # Template only: issue content (dor_excerpts/AC) may legitimately quote old command names.
+    template = _brief({**ho, "dor_excerpts": {}, "ac": []}) + _brief({**ho, "dor_excerpts": {}, "ac": []}, steer=True)
+    if "context-state" in template or "scope-lock" in template or "/resume" in template:
+        errors.append("T13 brief template must not reference context-state / scope-lock / resume")
+    if ".cursor/commands/autopilot.md" not in text:
+        errors.append("T13 autopilot.md path must stay unchanged (K1)")
+    old = {k: v for k, v in ho.items() if k != "issue_json"}
+    old_text = _brief(old)
+    if '"estimate": null' not in old_text:
+        errors.append("T13 pre-QUI-153 handoff must still get a bare ISSUE-JSON (→ STOP-LINEAR)")
+    lab = _brief({**ho, "repo": "workflow-lab"})
+    if "session-preflight" in lab:
+        errors.append("T13 workflow-lab brief must not instruct platform preflight")
+    return errors
 
 def main() -> int:
     errors: list[str] = []
@@ -448,6 +560,9 @@ def main() -> int:
         if "kryteria akceptacji" not in (blob.get("dor_excerpts") or {}):
             errors.append(f"T11b dor_excerpts, got {blob.get('dor_excerpts')}")
 
+    # T13 (QUI-153): ISSUE-JSON v1 in the brief, platform-preflight DoR passes, no context-state.
+    errors.extend(_t13_issue_json())
+
     # T12: real FAIL AC → steer follow-up (no probe text)
     steer_prompts: list[str] = []
 
@@ -499,8 +614,8 @@ def main() -> int:
             print(" -", item)
         return 1
     print(
-        "PASS: hermes_conductor T1-T12 "
-        "(early live, timeout, create-on-issue, followup, halt, auth, recover, adapter, real brief)"
+        "PASS: hermes_conductor T1-T13 "
+        "(early live, timeout, create-on-issue, followup, halt, auth, recover, adapter, real brief, ISSUE-JSON v1)"
     )
     return 0
 

@@ -2,6 +2,11 @@
 
 At Start we optionally fetch one issue (LINEAR_OPS_READ) and extract 6-field
 sections + AC checkboxes. Never dump raw description into Cloud prompt.
+
+QUI-153: ISSUE-JSON v1 = the issue metadata the platform preflight needs
+(`session-preflight.py <id> --issue-json tmp/issue-<id>.json`). Its
+`description` is a sanitized DoR digest (metadata block + AC + Rollback),
+not the raw Linear description.
 """
 from __future__ import annotations
 
@@ -26,6 +31,10 @@ IDENT_RE = re.compile(r"^([A-Z]+)-(\d+)$", re.I)
 LINEAR_GQL = os.environ.get("LINEAR_API", "https://api.linear.app/graphql")
 _MAX_SECTION = 600
 _MAX_AC = 12
+ISSUE_JSON_VERSION = 1
+_MAX_DOR_DIGEST = 2500
+_MAX_META_LINES = 20
+_HEADING_RE = re.compile(r"^\s*#{1,6}\s*(?:\d+[.)]?\s*)?(.+?)\s*$")
 
 
 def lab_probe_issue_ids() -> set[str]:
@@ -141,7 +150,7 @@ def fetch_linear_issue(issue_id: str) -> dict[str, Any] | None:
         "query": (
             "query($team: String!, $num: Float!) { issues(filter: { team: { key: { eq: $team } }, "
             "number: { eq: $num } }, first: 1) { nodes { identifier title description url "
-            "project { name } labels { nodes { name } } } } }"
+            "estimate state { name } project { name } labels { nodes { name } } } } }"
         ),
         "variables": {"team": team, "num": float(num)},
     }
@@ -166,6 +175,7 @@ def fetch_linear_issue(issue_id: str) -> dict[str, Any] | None:
         if isinstance(n, dict) and n.get("name")
     ]
     project = ((node.get("project") or {}) or {}).get("name") or ""
+    state = node.get("state") if isinstance(node.get("state"), dict) else {}
     return {
         "id": str(node.get("identifier") or ident),
         "title": node.get("title") or "",
@@ -173,7 +183,119 @@ def fetch_linear_issue(issue_id: str) -> dict[str, Any] | None:
         "url": node.get("url") or "",
         "labels": labels,
         "project": project,
+        "estimate": node.get("estimate"),
+        "status": str(state.get("name") or ""),
     }
+
+
+def _section(lines: list[str], wanted: tuple[str, ...]) -> list[str]:
+    """Body lines of the first markdown heading whose label contains a wanted word."""
+    out: list[str] = []
+    inside = False
+    for line in lines:
+        hm = _HEADING_RE.match(line) if line.lstrip().startswith("#") else None
+        if hm:
+            if inside:
+                break
+            label = hm.group(1).strip().lower()
+            inside = any(w in label for w in wanted)
+            continue
+        if inside and line.strip():
+            out.append(line.rstrip())
+    return out
+
+
+def dor_digest(description: str) -> str:
+    """Sanitized DoR text for the platform preflight (no raw description).
+
+    Keeps: leading metadata blockquote (Severity/NC/Fala/Owner/Zakres środowiska),
+    the acceptance-criteria section and the rollback section. Each line goes
+    through `_strip_inject` (URLs, code blocks, credentials-looking pairs).
+    """
+    text = str(description or "").replace("\r\n", "\n")
+    if not text.strip():
+        return ""
+    lines = text.split("\n")
+    meta: list[str] = []
+    for line in lines:
+        s = line.strip()
+        if s.startswith("#"):
+            break
+        if s.startswith(">"):
+            body = s.lstrip(">").strip()
+            if body:
+                meta.append(body)
+            if len(meta) >= _MAX_META_LINES:
+                break
+    ac = _section(lines, ("kryteria akceptacji", "acceptance"))
+    rollback = _section(lines, ("rollback",))
+    parts: list[str] = []
+    if meta:
+        parts.append("\n".join(meta))
+    if ac:
+        parts.append("## Kryteria akceptacji\n" + "\n".join(ac[: _MAX_AC + 4]))
+    if rollback:
+        parts.append("## Rollback\n" + "\n".join(rollback[:8]))
+    clean = [_strip_inject(p) for p in parts]
+    blob = "\n\n".join(p for p in clean if p)
+    # Never cut inside the rollback section silently: trim AC/meta first.
+    if len(blob) > _MAX_DOR_DIGEST and rollback:
+        tail = "\n\n" + _strip_inject("## Rollback\n" + "\n".join(rollback[:8]))[:600]
+        blob = blob[: _MAX_DOR_DIGEST - len(tail)].rstrip() + tail
+    return blob[:_MAX_DOR_DIGEST]
+
+
+def _estimate(value: Any) -> int | float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return value
+    if isinstance(value, dict):
+        return _estimate(value.get("value"))
+    try:
+        num = float(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+    return int(num) if num.is_integer() else num
+
+
+def build_issue_json(issue: dict[str, Any], description: str = "") -> dict[str, Any]:
+    """ISSUE-JSON v1 for `session-preflight.py --issue-json` (platform contract).
+
+    Missing data stays missing (estimate None, empty description) so the
+    preflight answers STOP-LINEAR instead of a fake PASS (fail-closed, B6a).
+    """
+    labels = [str(x)[:60] for x in (issue.get("labels") or []) if str(x).strip()][:30]
+    return {
+        "v": ISSUE_JSON_VERSION,
+        "id": str(issue.get("id") or issue.get("identifier") or "").strip().upper()[:40],
+        "title": _strip_inject(str(issue.get("title") or ""))[:200],
+        "status": str(issue.get("status") or "").strip()[:60],
+        "labels": labels,
+        "estimate": _estimate(issue.get("estimate")),
+        "project": str(issue.get("project") or "")[:80],
+        "repo": str(issue.get("repo") or "")[:80],
+        "description": dor_digest(description),
+    }
+
+
+def issue_json_block(issue_json: dict[str, Any]) -> str:
+    """Prompt block: the JSON + exact preflight steps. STOP wins over AC."""
+    iid = str(issue_json.get("id") or "").strip() or "?"
+    payload = json.dumps(issue_json, ensure_ascii=False, indent=2)
+    path = f"tmp/issue-{iid}.json"
+    return (
+        "ISSUE-JSON v1 (dane zadania z Linear, przekazane przez Hermesa):\n"
+        f"```json\n{payload}\n```\n"
+        f"KROK 1 (zawsze, przed jakąkolwiek zmianą): zapisz powyższy JSON bez zmian do `{path}` "
+        "(`tmp/` jest w .gitignore, nie commituj go).\n"
+        f"KROK 2: `python scripts/session-preflight.py {iid} --issue-json {path}`.\n"
+        "KROK 3: LANE=HERMES i exit 0 → `/start` (przejęcie pracy: najpierw przeczytaj "
+        "`### Stan sesji` z opisu otwartego PR tego zadania), potem AC.\n"
+        "LANE=UNKNOWN / LOCAL / BLOCKED albo STOP → zakończ w tej turze raportem STOP-LINEAR "
+        "z wyjściem preflightu i listą brakujących pól. Zero zmian w plikach, zero PR. "
+        "STOP ma pierwszeństwo przed AC."
+    )
 
 
 def enrich_issue(issue: dict[str, Any], *, fetch_linear: bool = True) -> dict[str, Any]:
@@ -187,6 +309,12 @@ def enrich_issue(issue: dict[str, Any], *, fetch_linear: bool = True) -> dict[st
         remote = fetch_linear_issue(issue_id)
         if remote:
             desc = str(remote.get("description") or "")
+            if out.get("estimate") in (None, "") and remote.get("estimate") not in (None, ""):
+                out["estimate"] = remote["estimate"]
+            if not out.get("status") and remote.get("status"):
+                out["status"] = remote["status"]
+            if not out.get("project") and remote.get("project"):
+                out["project"] = remote["project"]
             if not out.get("url") and remote.get("url"):
                 out["url"] = remote["url"]
             if not out.get("title") and remote.get("title"):
@@ -206,6 +334,7 @@ def enrich_issue(issue: dict[str, Any], *, fetch_linear: bool = True) -> dict[st
     out["dor_excerpts"] = excerpts
     out["ac"] = [f"AC-{i + 1}: {body}" for i, body in enumerate(ac_bodies)]
     out["brief_kind"] = resolve_brief_kind(out)
+    out["issue_json"] = build_issue_json(out, desc)
     # Never persist raw description into handoff file.
     out.pop("description", None)
     out.pop("body", None)

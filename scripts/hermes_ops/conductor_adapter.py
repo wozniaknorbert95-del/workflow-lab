@@ -167,6 +167,8 @@ def write_handoff(
         "brief_kind": str(enriched.get("brief_kind") or "real")[:20],
         "ac": ac_out,
         "dor_excerpts": dor_out,
+        # QUI-153: preflight metadata (sanitized digest, bounded in issue_brief).
+        "issue_json": enriched.get("issue_json") if isinstance(enriched.get("issue_json"), dict) else None,
         "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
     tmp = target.with_suffix(".tmp")
