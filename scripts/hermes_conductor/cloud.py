@@ -124,6 +124,12 @@ class CloudClient:
     def followup_run(self, agent_id: str, prompt: str) -> dict[str, Any]:
         return self.call("POST", f"/{agent_id}/runs", {"prompt": {"text": prompt[:20000]}})
 
+    def get_agent(self, agent_id: str) -> dict[str, Any]:
+        return self.call("GET", f"/{agent_id}", None, timeout=15)
+
+    def get_run(self, agent_id: str, run_id: str) -> dict[str, Any]:
+        return self.call("GET", f"/{agent_id}/runs/{run_id}", None, timeout=15)
+
     def stream(self, agent_id: str, run_id: str) -> dict[str, Any]:
         if not agent_id or not run_id:
             return {"ok": True, "code": 200, "body": {"events": []}}
@@ -233,3 +239,41 @@ def tests_from_stream(resp: dict[str, Any]) -> list[dict[str, str]]:
         if cmd or excerpt:
             out.append({"cmd": cmd or "tool_call", "excerpt": excerpt, "verdict": verdict})
     return out
+
+
+RUN_ACTIVE = ("CREATING", "RUNNING")
+RUN_TERMINAL = ("FINISHED", "ERROR", "CANCELLED", "EXPIRED")
+
+
+def _https(value: Any) -> str:
+    text = str(value or "").strip()
+    return text[:500] if text.startswith("https://") and " " not in text else ""
+
+
+def run_snapshot(resp: dict[str, Any]) -> dict[str, str]:
+    """GET /v1/agents/{id}/runs/{runId} → {status, pr_url, branch, result}. {} when unknown.
+
+    Unknown shape / HTTP error = {} so the caller never invents a state.
+    """
+    if not isinstance(resp, dict) or not resp.get("ok"):
+        return {}
+    body = resp.get("body") if isinstance(resp.get("body"), dict) else {}
+    run = body.get("run") if isinstance(body.get("run"), dict) else body
+    status = str(run.get("status") or "").strip().upper()
+    if status not in RUN_ACTIVE + RUN_TERMINAL:
+        return {}
+    git = run.get("git") if isinstance(run.get("git"), dict) else {}
+    branches = git.get("branches") if isinstance(git.get("branches"), list) else []
+    pr_url = ""
+    branch = ""
+    for item in branches:
+        if not isinstance(item, dict):
+            continue
+        branch = branch or str(item.get("branch") or "")[:200]
+        pr_url = pr_url or _https(item.get("prUrl"))
+    return {
+        "status": status,
+        "pr_url": pr_url,
+        "branch": branch,
+        "result": str(run.get("result") or "")[:1500],
+    }

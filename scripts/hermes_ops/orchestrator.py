@@ -1,6 +1,7 @@
 """S0 Linear → S2 conductor handoff → S3 PR → S4 checks → S6 merge. No S-deploy."""
 from __future__ import annotations
 
+import calendar
 import json
 import os
 import time
@@ -9,6 +10,9 @@ from typing import Any
 
 from . import policy
 from .conductor_adapter import (
+    FINAL_PHASES,
+    conductor_phase,
+    conductor_pr_number,
     load_conductor_status,
     merge_conductor_into_live,
     refuse_of,
@@ -16,7 +20,7 @@ from .conductor_adapter import (
     timeout_reason,
     write_handoff,
 )
-from .github import GitHubOps
+from .github import OWNER, GitHubOps
 from .live_enrich import build_approval, enrich_live
 from .router import (
     LANE_AUTOPILOT,
@@ -35,6 +39,21 @@ CMD_PATH = Path(os.environ.get("HERMES_OPS_CMD", "data/ops-cmd.json"))
 STATE_PATH = Path(os.environ.get("HERMES_OPS_STATE", "data/hermes-ops-state.json"))
 TTL_MIN = int(os.environ.get("OPS_TTL_MIN", "15"))
 READ_TOKEN = os.environ.get("GITHUB_ENGINEER_TOKEN") or os.environ.get("GITHUB_OPS_WRITE", "")
+# QUI-163: Hermes leads the session (watch → PR → CI → D → follow-up). While the conductor
+# reports an active phase with a fresh heartbeat, the slot stays busy past OPS_TTL_MIN.
+CONDUCTOR_FRESH_SEC = int(os.environ.get("OPS_CONDUCTOR_FRESH_SEC", "600"))
+CONDUCTOR_MAX_MIN = int(os.environ.get("OPS_CONDUCTOR_MAX_MIN", "180"))
+
+
+def _iso_age(value: Any) -> float | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        ts = calendar.timegm(time.strptime(text[:19], "%Y-%m-%dT%H:%M:%S"))
+    except (ValueError, OverflowError):
+        return None
+    return time.time() - ts
 
 
 class ConcurrentError(RuntimeError):
@@ -89,7 +108,10 @@ class Engine:
         if not lock:
             return False
         started = float(lock.get("started") or 0)
-        if started and (time.time() - started) > TTL_MIN * 60:
+        age = (time.time() - started) if started else 0.0
+        if started and age > TTL_MIN * 60 and age < CONDUCTOR_MAX_MIN * 60 and self._conductor_active(lock):
+            return True
+        if started and age > TTL_MIN * 60:
             self.engine_state = "PAUSED"
             self._clear_lock()
             append_event(
@@ -129,6 +151,42 @@ class Engine:
         tmp = self.state_path.with_suffix(".tmp")
         tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         tmp.replace(self.state_path)
+
+    def _conductor_active(self, lock: dict[str, Any]) -> bool:
+        """Conductor still leads this issue (watching/verify) and wrote recently."""
+        status_path, _ = self._conductor_paths()
+        blob = load_conductor_status(status_path)
+        phase = conductor_phase(blob, str(lock.get("issue_id") or ""))
+        if phase not in ("watching", "verify"):
+            return False
+        age = _iso_age((blob or {}).get("at"))
+        return age is not None and age < CONDUCTOR_FRESH_SEC
+
+    def _release_if_conductor_final(self, blob: dict[str, Any] | None, lock: dict[str, Any]) -> bool:
+        """Session over (done / hitl / failed) → slot free, keep the live snapshot for /ops."""
+        issue_id = str(lock.get("issue_id") or "")
+        phase = conductor_phase(blob, issue_id)
+        if phase not in FINAL_PHASES:
+            return False
+        cond = (blob or {}).get("conductor") if isinstance((blob or {}).get("conductor"), dict) else {}
+        append_event(
+            {
+                "kind": "conductor_" + phase,
+                "issue": issue_id,
+                "repo": lock.get("repo"),
+                "pr": lock.get("pr"),
+                "agent": self.worker,
+                "result": str(cond.get("verdict") or "UNKNOWN"),
+                "input_tokens": None,
+                "output_tokens": None,
+                "cost": None,
+            },
+            self.ledger,
+        )
+        self.engine_state = "PAUSED"
+        self._clear_lock()
+        self.save_state()
+        return True
 
     def _conductor_paths(self) -> tuple[Path, Path]:
         # Prefer ACADEMY_DATA_DIR (same default as conductor_adapter) over lock_parent.
@@ -419,6 +477,16 @@ class Engine:
         issue_id = str(lock.get("issue_id") or "")
         if not issue_id:
             return
+        status_path, _ = self._conductor_paths()
+        blob = load_conductor_status(status_path)
+        if not lock.get("pr"):
+            # Cloud API git.branches[].prUrl (conductor) first; then GitHub list fallback.
+            pr_c = conductor_pr_number(
+                blob, owner=OWNER, repo=str(lock.get("repo") or "workflow-lab"), issue_id=issue_id
+            )
+            if pr_c > 0:
+                lock = {**lock, "pr": pr_c}
+                self._write_lock(lock)
         if not lock.get("pr"):
             found = self.github.find_agent_pull(
                 str(lock.get("repo") or "workflow-lab"),
@@ -459,12 +527,13 @@ class Engine:
             if lock.get("cursor_triggered")
             else None,
         )
-        status_path, _ = self._conductor_paths()
         self.live = merge_conductor_into_live(
             self.live,
-            load_conductor_status(status_path),
+            blob,
             work_mode=sanitize_work_mode(lock.get("work_mode")),
         )
+        if self._release_if_conductor_final(blob, lock):
+            return
         self._observe_merge_if_done()
 
     def _observe_merge_if_done(self) -> None:

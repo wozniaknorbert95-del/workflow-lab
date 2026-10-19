@@ -1,16 +1,21 @@
 """Conductor loop: handoff → Cloud API → live JSON. Not the tick."""
 from __future__ import annotations
 
+import os
 import time
 from typing import Any
 
 from hermes_conductor.cloud import (
     CloudClient,
+    RUN_ACTIVE,
+    RUN_TERMINAL,
     busy_or_error,
     extract_ids,
     recover_agent_by_name,
+    run_snapshot,
     tests_from_stream,
 )
+from hermes_conductor.verdict import tool_d
 from hermes_ops.issue_brief import build_issue_json, issue_json_block
 from hermes_conductor.io import (
     cursor_key,
@@ -28,6 +33,36 @@ from hermes_conductor.io import (
 
 
 PLATFORM_REPO = "dsaas-platform-main"
+# QUI-163: Hermes owns the session after create (S2→S6), not one prompt.
+FINAL_PHASES = ("done", "hitl", "failed")
+MAX_EVENTS = 12
+
+
+def _env_num(name: str, default: float) -> float:
+    try:
+        n = float(os.environ.get(name) or default)
+    except (TypeError, ValueError):
+        n = default
+    return n if n > 0 else default
+
+
+def watch_sec() -> float:
+    return _env_num("CONDUCTOR_WATCH_SEC", 15)
+
+
+def verify_sec() -> float:
+    """Max wait for required checks after the run ends, then HITL."""
+    return _env_num("CONDUCTOR_VERIFY_SEC", 2700)
+
+
+def auto_pr_for(mode: str, repo: str) -> bool:
+    """buduj = PR. testuj on the platform = PR as proof (no auto-merge there).
+
+    workflow-lab testuj stays off: D-AUTOMERGE would merge a non-draft PR.
+    """
+    if mode == "buduj":
+        return True
+    return mode == "testuj" and repo == PLATFORM_REPO
 
 
 def _tests(cli: CloudClient, agent_id: str, run_id: str) -> list[dict[str, str]]:
@@ -48,12 +83,30 @@ def _brief_kind(handoff: dict[str, Any]) -> str:
     return "real"
 
 
-def _mode_rules(mode: str) -> str:
+def _mode_rules(mode: str, repo: str = "") -> str:
     if mode == "testuj":
-        return "Tryb testuj: dowód bez merge (autoCreatePR off)."
+        if auto_pr_for(mode, repo):
+            return (
+                "Tryb testuj: dowód w PR, bez merge. Po zakończeniu runu Cursor sam otworzy PR "
+                "(autoCreatePR) — nie otwieraj PR ręcznie, wystarczy commit i push gałęzi. "
+                "W tytule PR: NIE SCALAĆ."
+            )
+        return "Tryb testuj: dowód bez merge (autoCreatePR off — workflow-lab auto-merguje PR)."
     if mode == "ulepszaj":
         return "Tryb ulepszaj: jedna propozycja / draft — zero kodu, zero PR."
     return "Tryb buduj: wdróż issue, otwórz PR po zmianie."
+
+
+def _ac_items(handoff: dict[str, Any]) -> list[tuple[str, str]]:
+    """(id, text) pairs. Same ids in brief, seed and tool D."""
+    out: list[tuple[str, str]] = []
+    for i, line in enumerate(_ac_lines(handoff)[:20]):
+        aid = line.split(":", 1)[0].strip() if ":" in line else f"AC-{i + 1}"
+        if not aid.startswith("AC"):
+            aid = f"AC-{i + 1}"
+        text = line if line.startswith(aid) else f"{aid}: {line}"
+        out.append((aid[:80], text))
+    return out
 
 
 def _ac_lines(handoff: dict[str, Any]) -> list[str]:
@@ -122,7 +175,12 @@ def _brief(handoff: dict[str, Any], *, fail_ac: bool = False, steer: bool = Fals
     if not url and issue:
         url = f"https://linear.app/quietforge/issue/{issue}"
     ac = _ac_lines(handoff)
-    ac_block = "\n".join(f"- {x}" for x in ac) if ac else "- (brak checklisty w handoff — czytaj Linear URL / kryteria w dor_excerpts)"
+    items = _ac_items(handoff)
+    ac_block = (
+        "\n".join(f"- {text}" for _, text in items)
+        if items
+        else "- (brak checklisty w handoff — czytaj Linear URL / kryteria w dor_excerpts)"
+    )
     dor = _dor_block(handoff)
     dor_part = f"\n\nDoR (sanitized excerpts):\n{dor}" if dor else ""
     steer_part = ""
@@ -158,9 +216,11 @@ def _brief(handoff: dict[str, Any], *, fail_ac: bool = False, steer: bool = Fals
         f"Linear: {url}\n"
         f"work_mode={mode}. Repo={repo}.\n"
         "Zakazy: zero deploy, zero SSH prod, zero sekretów, zero workflow_dispatch, zero push main.\n"
-        f"{_mode_rules(mode)}\n"
+        f"{_mode_rules(mode, repo)}\n"
         f"{playbook}\n"
-        f"AC do domknięcia:\n{ac_block}"
+        f"AC do domknięcia:\n{ac_block}\n"
+        "Raport końcowy (ostatnie linie odpowiedzi): jedna linia na AC `AC-n: PASS|FAIL|UNKNOWN — dowód`, "
+        "potem `WYNIK: PASS|PARTIAL|STOP`. Hermes weryfikuje to narzędziem D (PR + CI)."
         f"{issue_part}"
         f"{dor_part}"
         f"{steer_part}"
@@ -171,16 +231,10 @@ def _ac_seed(handoff: dict[str, Any], *, fail_first: bool) -> list[dict[str, str
     kind = _brief_kind(handoff)
     if kind == "lab_probe":
         return [{"id": "AC-1", "verdict": "FAIL" if fail_first else "UNKNOWN"}]
-    lines = _ac_lines(handoff)
-    if not lines:
+    items = _ac_items(handoff)
+    if not items:
         return [{"id": "AC-1", "verdict": "UNKNOWN"}]
-    out: list[dict[str, str]] = []
-    for i, line in enumerate(lines[:20]):
-        aid = line.split(":", 1)[0].strip() if ":" in line else f"AC-{i + 1}"
-        if not aid.startswith("AC"):
-            aid = f"AC-{i + 1}"
-        out.append({"id": aid[:80], "verdict": "UNKNOWN"})
-    return out
+    return [{"id": aid, "verdict": "UNKNOWN"} for aid, _ in items]
 
 
 def _steer_brief(handoff: dict[str, Any], prev: dict[str, Any]) -> str:
@@ -217,6 +271,15 @@ def _live(
     halted: bool = False,
     create_ms: int | None = None,
     http_code: int | None = None,
+    phase: str = "",
+    verdict: str = "",
+    d: list[str] | None = None,
+    run_status: str = "",
+    pr_url: str = "",
+    branch: str = "",
+    events: list[dict[str, str]] | None = None,
+    watch_at: float = 0.0,
+    finished_at: float = 0.0,
 ) -> dict[str, Any]:
     mode = work_mode(handoff.get("work_mode"))
     issue = str(handoff.get("issue_id") or "")
@@ -231,6 +294,9 @@ def _live(
             "agent_id": agent_id,
             "run_id": run_id,
             "model": "",
+            "run_status": run_status,
+            "pr_url": pr_url,
+            "branch": branch,
         },
         "tests": tests or [],
         "conductor": {
@@ -242,6 +308,12 @@ def _live(
             "dod": ["W-05"],
             "local_remaining": ["Deploy — Zasada 11"],
             "report_pl": report,
+            "phase": phase,
+            "verdict": verdict,
+            "d": list(d or [])[:10],
+            "events": list(events or [])[-MAX_EVENTS:],
+            "watch_at": float(watch_at or 0),
+            "finished_at": float(finished_at or 0),
         },
     }
     if create_ms is not None:
@@ -254,6 +326,170 @@ def _live(
     if halted:
         blob["halted"] = True
     return blob
+
+
+def _ev(text: str) -> dict[str, str]:
+    return {"at": now_iso(), "text": str(text)[:160]}
+
+
+def _events(cond: dict[str, Any], *texts: str) -> list[dict[str, str]]:
+    out = [e for e in (cond.get("events") or []) if isinstance(e, dict)]
+    out.extend(_ev(t) for t in texts if t)
+    return out[-MAX_EVENTS:]
+
+
+def _followup_text(handoff: dict[str, Any], steer: str, n: int) -> str:
+    mode = work_mode(handoff.get("work_mode"))
+    repo = str(handoff.get("repo") or "workflow-lab").strip() or "workflow-lab"
+    return (
+        f"FOLLOW-UP Hermesa (ta sama sesja, {n}/{max_followups()}), issue {handoff.get('issue_id')}.\n"
+        f"Narzędzie D: {steer}\n"
+        f"{_mode_rules(mode, repo)}\n"
+        "Trzymaj kontrakt /autopilot — nie zaczynaj od zera. Zakazy bez zmian (zero deploy, SSH, sekretów, push main).\n"
+        "Zakończ raportem: jedna linia na AC `AC-n: PASS|FAIL|UNKNOWN — dowód`, potem `WYNIK: PASS|PARTIAL|STOP`."
+    )
+
+
+def _report(verdict: str, reasons: list[str], pr_url: str, nxt: str) -> str:
+    why = reasons[0] if reasons else "brak uwag"
+    pr = f" PR: {pr_url}." if pr_url else ""
+    return f"D {verdict or 'UNKNOWN'}: {why}.{pr} Do laptopa: {nxt}"[:800]
+
+
+def _watch(
+    *,
+    handoff: dict[str, Any],
+    prev: dict[str, Any],
+    cli: CloudClient,
+    agent_id: str,
+    run_id: str,
+    run_url: str,
+    followups: int,
+    ops: dict[str, Any] | None,
+    auto_pr: bool,
+) -> dict[str, Any] | None:
+    """S2→S6 after create: watch run → PR → CI → tool D → follow-up | done | HITL.
+
+    None = Cloud run state unreadable → caller keeps legacy behaviour.
+    """
+    cond = prev.get("conductor") if isinstance(prev.get("conductor"), dict) else {}
+    agent_prev = prev.get("agent") if isinstance(prev.get("agent"), dict) else {}
+    now = time.time()
+    if now - float(cond.get("watch_at") or 0) < watch_sec():
+        return {"ok": True, "state": "unchanged", "wrote": False, "live": prev}
+    rid = run_id
+    if not rid:
+        ag = cli.get_agent(agent_id)
+        body = ag.get("body") if isinstance(ag.get("body"), dict) else {}
+        rid = str(body.get("latestRunId") or "")[:80] if ag.get("ok") else ""
+    snap = run_snapshot(cli.get_run(agent_id, rid)) if rid else {}
+    if not snap:
+        return None
+    issue = str(handoff.get("issue_id") or "")
+    status = snap["status"]
+    pr_url = snap.get("pr_url") or str(agent_prev.get("pr_url") or "")
+    branch = snap.get("branch") or str(agent_prev.get("branch") or "")
+    texts: list[str] = []
+    if status != str(agent_prev.get("run_status") or ""):
+        texts.append(f"run {status}")
+    if pr_url and pr_url != str(agent_prev.get("pr_url") or ""):
+        texts.append(f"S3 PR {pr_url}")
+    prev_ac = [x for x in (cond.get("ac") or []) if isinstance(x, dict)] or _ac_seed(handoff, fail_first=False)
+    tests = list(prev.get("tests") or [])
+    common: dict[str, Any] = {
+        "agent_id": agent_id,
+        "run_id": rid,
+        "run_url": run_url,
+        "run_status": status,
+        "pr_url": pr_url,
+        "branch": branch,
+        "watch_at": now,
+    }
+
+    if status in RUN_ACTIVE:
+        blob = _live(
+            handoff,
+            **common,
+            tests=tests,
+            followups=followups,
+            ac=prev_ac,
+            phase="watching",
+            events=_events(cond, *texts),
+            report=f"Hermes prowadzi: run {status} — czekam na koniec (S2).",
+        )
+        return {"ok": True, "state": "watching", "wrote": True, "live": blob}
+
+    if not tests and str(cond.get("phase") or "") == "watching":
+        tests = _tests(cli, agent_id, rid)  # once, at the run end (stream may block up to 15 s)
+    finished_at = float(cond.get("finished_at") or 0) or now
+    ops_live = (ops or {}).get("live") if isinstance(ops, dict) else None
+    res = tool_d(
+        run={**snap, "pr_url": pr_url},
+        ops_live=ops_live if isinstance(ops_live, dict) else None,
+        issue=issue,
+        ac_ids=[str(x.get("id") or "AC-1") for x in prev_ac],
+        auto_pr=auto_pr,
+    )
+    pr_url = res.get("pr_url") or pr_url
+    common["pr_url"] = pr_url
+    action = res["action"]
+    verdict = res["verdict"]
+    reasons = list(res.get("reasons") or [])
+    ac = res.get("ac") or prev_ac
+
+    def out(phase: str, report: str, state: str, *extra: str, **kw: Any) -> dict[str, Any]:
+        last_phase = str(cond.get("phase") or "")
+        evs = list(texts) + ([f"D {verdict}: {'; '.join(reasons)[:120]}"] if phase != last_phase else []) + list(extra)
+        blob = _live(
+            handoff,
+            **{**common, **kw.pop("common", {})},
+            tests=tests,
+            followups=kw.pop("followups", followups),
+            ac=kw.pop("ac", ac),
+            phase=phase,
+            verdict=verdict,
+            d=reasons,
+            events=_events(cond, *evs),
+            finished_at=kw.pop("finished_at", finished_at),
+            report=report,
+        )
+        return {"ok": True, "state": state, "wrote": True, "live": blob, "d": res}
+
+    if action == "wait":
+        if now - finished_at > verify_sec():
+            reasons.append(f"CI nie wróciło w {int(verify_sec() // 60)} min")
+            return out("hitl", _report("UNKNOWN", reasons, pr_url, "sprawdź checki PR (HITL)."), "hitl")
+        return out("verify", f"Run {status} · czekam na CI (S4) przed werdyktem D.", "verify")
+
+    if action == "followup":
+        limit = max_followups()
+        if followups >= limit:
+            reasons.append(f"limit follow-up {limit} wyczerpany")
+            return out("hitl", _report("FAIL", reasons, pr_url, "HITL — przejmij lokalnie (/start)."), "hitl")
+        cli.unarchive(agent_id)
+        resp = cli.followup_run(agent_id, _followup_text(handoff, str(res.get("steer") or ""), followups + 1))
+        if not resp.get("ok"):
+            why = busy_or_error(resp)
+            return out("verify", f"Follow-up padł ({why}) — ponowię w kolejnym kroku.", "verify", f"follow-up padł: {why}")
+        _new_id, new_run, _new_url = extract_ids(resp)
+        return out(
+            "watching",
+            f"D FAIL → follow-up {followups + 1}/{limit} na tej samej sesji: {reasons[0] if reasons else ''}"[:800],
+            "followup",
+            f"follow-up {followups + 1}/{limit}: {str(res.get('steer') or '')[:100]}",
+            common={"run_id": new_run or rid, "run_status": "CREATING"},
+            followups=followups + 1,
+            ac=[{"id": str(x.get("id") or "AC-1"), "verdict": "UNKNOWN"} for x in prev_ac],
+            finished_at=0.0,
+        )
+
+    if action == "hitl":
+        return out("hitl", _report(verdict, reasons, pr_url, "HITL — decyzja Dowódcy."), "hitl")
+
+    nxt = "nic (testuj = bez merge)." if work_mode(handoff.get("work_mode")) == "testuj" else "deploy — Zasada 11."
+    if verdict != "PASS":
+        nxt = "sprawdź AC (brak dowodu) — " + nxt
+    return out("done", _report(verdict, reasons, pr_url, nxt), "done")
 
 
 def _ac_fail(prev: dict[str, Any]) -> bool:
@@ -321,10 +557,29 @@ def step(
 
     cli = client or CloudClient(key)
     mode = work_mode(handoff.get("work_mode"))
-    auto_pr = mode == "buduj"
+    repo = str(handoff.get("repo") or "workflow-lab").strip() or "workflow-lab"
+    auto_pr = auto_pr_for(mode, repo)
 
-    # Same session: follow-up only on AC FAIL with budget left.
     if agent_id and same_cmd and same_issue and run_url:
+        cond = prev.get("conductor") if isinstance(prev.get("conductor"), dict) else {}
+        phase = str(cond.get("phase") or "")
+        if phase in FINAL_PHASES:
+            return {"ok": True, "state": "unchanged", "wrote": False, "live": prev}
+        if phase:
+            watched = _watch(
+                handoff=handoff,
+                prev=prev,
+                cli=cli,
+                agent_id=agent_id,
+                run_id=run_id,
+                run_url=run_url,
+                followups=followups,
+                ops=ops,
+                auto_pr=auto_pr,
+            )
+            if watched is not None:
+                return watched
+        # Legacy (pre-QUI-163 live / Cloud run state unreadable): stream + AC FAIL follow-up.
         if _ac_fail(prev):
             if followups >= max_followups():
                 blob = dict(prev)
@@ -351,16 +606,16 @@ def step(
             prev_ac = list((prev.get("conductor") or {}).get("ac") or [])
             if not prev_ac:
                 prev_ac = _ac_seed(handoff, fail_first=False)
-            # After steer: mark previously FAIL as PASS (lab + real); UNKNOWN untouched.
+            # After steer: FAIL → UNKNOWN until tool D sees evidence (never painted PASS).
             next_ac: list[dict[str, str]] = []
             for item in prev_ac:
                 if not isinstance(item, dict):
                     continue
                 aid = str(item.get("id") or "AC-1")[:80]
                 ver = str(item.get("verdict") or "UNKNOWN")
-                next_ac.append({"id": aid, "verdict": "PASS" if ver == "FAIL" else ver})
+                next_ac.append({"id": aid, "verdict": "UNKNOWN" if ver == "FAIL" else ver})
             if not next_ac:
-                next_ac = [{"id": "AC-1", "verdict": "PASS"}]
+                next_ac = [{"id": "AC-1", "verdict": "UNKNOWN"}]
             blob = _live(
                 handoff,
                 agent_id=use_id,
@@ -370,21 +625,28 @@ def step(
                 followups=followups + 1,
                 ac=next_ac,
                 http_code=int(resp.get("code") or 200),
-                report="Zrobione: follow-up na tej samej sesji. Do laptopa: deploy. Padło: nic.",
+                phase="watching",
+                events=_events(cond, f"follow-up {followups + 1}/{max_followups()} (AC FAIL)"),
+                report="Follow-up wysłany na tej samej sesji — czekam na wynik runu.",
             )
             return {"ok": True, "state": "followup", "wrote": True, "live": blob}
-        # Enrich tests after early-create write (stream on next tick).
+        # Enrich tests after early-create write (stream on next tick). FAIL paints FAIL; never PASS.
         prev_tests = list(prev.get("tests") or [])
         ac = list((prev.get("conductor") or {}).get("ac") or [])
         unknown = (not ac) or any(str(x.get("verdict")) == "UNKNOWN" for x in ac if isinstance(x, dict))
         if not prev_tests and unknown:
             tests = _tests(cli, agent_id, run_id)
             if tests:
-                verdict = "PASS" if all(t.get("verdict") != "FAIL" for t in tests) else "FAIL"
+                failed = any(t.get("verdict") == "FAIL" for t in tests)
                 seed = ac if ac else _ac_seed(handoff, fail_first=False)
-                painted = [{"id": str(x.get("id") or "AC-1")[:80], "verdict": verdict} for x in seed if isinstance(x, dict)]
-                if not painted:
-                    painted = [{"id": "AC-1", "verdict": verdict}]
+                painted = [
+                    {
+                        "id": str(x.get("id") or "AC-1")[:80],
+                        "verdict": "FAIL" if failed else str(x.get("verdict") or "UNKNOWN"),
+                    }
+                    for x in seed
+                    if isinstance(x, dict)
+                ] or [{"id": "AC-1", "verdict": "FAIL" if failed else "UNKNOWN"}]
                 blob = _live(
                     handoff,
                     agent_id=agent_id,
@@ -393,9 +655,11 @@ def step(
                     tests=tests,
                     followups=followups,
                     ac=painted,
-                    report="Zrobione: sesja Cloud API. Do laptopa: deploy. Padło: nic."
-                    if verdict == "PASS"
-                    else "Padło: testy FAIL — follow-up gdy budżet. Do laptopa: nic.",
+                    phase=phase,
+                    events=list(cond.get("events") or []),
+                    report="Padło: testy FAIL — follow-up gdy budżet."
+                    if failed
+                    else "Strumień odczytany; AC bez dowodu = UNKNOWN (czekam na narzędzie D).",
                 )
                 return {"ok": True, "state": "enriched", "wrote": True, "live": blob}
         return {"ok": True, "state": "unchanged", "wrote": False, "live": prev}
@@ -474,6 +738,8 @@ def step(
         http_code=int(resp.get("code") or 200),
         ac=seed_ac,
         report=report,
+        phase="watching",
+        events=[_ev(f"Hermes: sesja Cloud utworzona ({mode}, autoCreatePR={'on' if auto_pr else 'off'})")],
     )
     return {
         "ok": True,
