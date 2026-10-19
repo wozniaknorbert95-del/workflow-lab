@@ -2,6 +2,8 @@
 FROM python:3.12-slim
 WORKDIR /app
 COPY scripts/hermes_conductor /app/hermes_conductor
+# loop.py imports hermes_ops.issue_brief (QUI-153); stdlib-only deps. Guard: scripts/test_conductor_image.py + CI conductor-image.
+COPY scripts/hermes_ops /app/hermes_ops
 COPY scripts/hermes-conductor-loop.py /app/hermes-conductor-loop.py
 ENV PYTHONUNBUFFERED=1
 CMD ["python", "/app/hermes-conductor-loop.py"]
