@@ -22,6 +22,9 @@ HANDOFF_PATH = Path(
     or str(_DEFAULT_DATA / "hermes-conductor-handoff.json")
 )
 WORK_MODES = ("buduj", "testuj", "ulepszaj")
+# QUI-163: conductor session phases. Final = slot free (tick releases the lock).
+PHASES = ("watching", "verify", "done", "hitl", "failed")
+FINAL_PHASES = ("done", "hitl", "failed")
 DEFAULT_TTL_SEC = 900
 _URL_DENY = ("token=", "access_token", "authorization", "@", "api_key", "apikey", "secret=")
 
@@ -91,6 +94,9 @@ def sanitize_conductor(raw: Any, *, work_mode: str = "buduj") -> dict[str, Any]:
     dod = blob.get("dod") if isinstance(blob.get("dod"), list) else []
     local = blob.get("local_remaining") if isinstance(blob.get("local_remaining"), list) else []
     mode = sanitize_work_mode(blob.get("mode") or work_mode)
+    phase = str(blob.get("phase") or "").strip().lower()
+    verdict = str(blob.get("verdict") or "").strip().upper()
+    d_raw = blob.get("d") if isinstance(blob.get("d"), list) else []
     return {
         "role": str(blob.get("role") or "nous")[:40],
         "model": str(blob.get("model") or "")[:80],
@@ -101,7 +107,53 @@ def sanitize_conductor(raw: Any, *, work_mode: str = "buduj") -> dict[str, Any]:
         "ac": ac_out,
         "dod": [str(x).strip()[:80] for x in dod if str(x).strip()][:20],
         "local_remaining": [str(x).strip()[:120] for x in local if str(x).strip()][:20],
+        "phase": phase if phase in PHASES else "",
+        "verdict": verdict if verdict in ("PASS", "FAIL", "UNKNOWN") else "",
+        "d": [str(x).strip()[:160] for x in d_raw if str(x).strip()][:10],
+        "events": sanitize_events(blob.get("events")),
     }
+
+
+def sanitize_events(raw: Any) -> list[dict[str, str]]:
+    if not isinstance(raw, list):
+        return []
+    out: list[dict[str, str]] = []
+    for item in raw[-12:]:
+        if not isinstance(item, dict):
+            continue
+        text = str(item.get("text") or "").strip()[:160]
+        if not text or any(bad in text.lower() for bad in _URL_DENY if bad != "@"):
+            continue
+        out.append({"at": str(item.get("at") or "")[:30], "text": text})
+    return out
+
+
+def conductor_phase(blob: dict[str, Any] | None, issue_id: str = "") -> str:
+    """Phase of the conductor session for this issue ('' when foreign / missing)."""
+    if not isinstance(blob, dict):
+        return ""
+    src_issue = str(blob.get("issue") or blob.get("issue_id") or "").strip()
+    if issue_id and src_issue != str(issue_id).strip():
+        return ""
+    cond = blob.get("conductor") if isinstance(blob.get("conductor"), dict) else {}
+    phase = str(cond.get("phase") or "").strip().lower()
+    return phase if phase in PHASES else ""
+
+
+def conductor_pr_number(blob: dict[str, Any] | None, *, owner: str, repo: str, issue_id: str = "") -> int:
+    """PR number from Cloud API `git.branches[].prUrl` (conductor live), same issue + repo only."""
+    if not isinstance(blob, dict):
+        return 0
+    src_issue = str(blob.get("issue") or blob.get("issue_id") or "").strip()
+    if issue_id and src_issue != str(issue_id).strip():
+        return 0
+    agent = blob.get("agent") if isinstance(blob.get("agent"), dict) else {}
+    url = https_url(agent.get("pr_url"))
+    prefix = f"https://github.com/{owner}/{repo}/pull/"
+    if not url.startswith(prefix):
+        return 0
+    tail = url[len(prefix):].split("/", 1)[0].split("?", 1)[0]
+    return int(tail) if tail.isdigit() else 0
 
 
 def load_conductor_status(path: Path | None = None) -> dict[str, Any] | None:
@@ -209,6 +261,8 @@ def merge_conductor_into_live(
         "model": model,
         "run_id": run_id,
         "agent_id": agent_id,
+        "run_status": "" if purge else str(agent_src.get("run_status") or "")[:20],
+        "pr_url": "" if purge else https_url(agent_src.get("pr_url")),
     }
     if halted:
         out["halted"] = True
@@ -221,6 +275,18 @@ def merge_conductor_into_live(
         out["tests"] = []
     cond_src = src.get("conductor") if isinstance(src.get("conductor"), dict) else src
     out["conductor"] = sanitize_conductor(cond_src, work_mode=work_mode)
+    if purge:
+        out["conductor"]["events"] = []
+    # Dziennik (/ops): conductor events next to GitHub comments (QUI-163).
+    events = out["conductor"].get("events") or []
+    if events:
+        recent = [r for r in (out.get("recent") or []) if isinstance(r, dict)]
+        seen = {(r.get("at"), r.get("text")) for r in recent}
+        for ev in events:
+            row = {"at": ev["at"], "text": "Hermes: " + ev["text"] if not ev["text"].startswith("Hermes") else ev["text"]}
+            if (row["at"], row["text"]) not in seen:
+                recent.append(row)
+        out["recent"] = sorted(recent, key=lambda r: str(r.get("at") or ""))[-15:]
     if run_url:
         steps = list(out.get("steps") or [])
         for step in steps:

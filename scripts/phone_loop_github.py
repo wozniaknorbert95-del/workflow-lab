@@ -50,6 +50,35 @@ def token_from_env_file(path: str) -> str:
     return ""
 
 
+# Required check per repo: workflow-lab `validate`, dsaas-platform-main `gates` (K10).
+REQUIRED_CHECKS = ("validate", "gates")
+
+
+def checks_from_runs(runs: list[dict[str, Any]]) -> dict[str, Any]:
+    """check-runs → {validate, execute, jobs_ran_steps}. In progress = pending (UNKNOWN), not FAIL.
+
+    No runs yet = {} (S4 UNKNOWN "checks not available"), never a red S4.
+    """
+    if not runs:
+        return {}
+    names: dict[str, Any] = {}
+    for r in runs:
+        if isinstance(r, dict) and r.get("name"):
+            names[str(r.get("name"))] = r.get("conclusion") or "pending"
+    required = next((names[n] for n in REQUIRED_CHECKS if n in names), None)
+    validate = required or "pending"
+    execute = (
+        names.get("execute")
+        or names.get("phone-loop-guard")
+        or ("success" if validate == "success" else ("pending" if validate == "pending" else "skipped"))
+    )
+    return {
+        "validate": validate,
+        "execute": execute,
+        "jobs_ran_steps": any(isinstance(r, dict) and r.get("conclusion") == "success" and r.get("name") for r in runs),
+    }
+
+
 def build_live_payload(
     *,
     repo: str = DEFAULT_REPO,
@@ -110,20 +139,14 @@ def build_live_payload(
                     f"/repos/{owner}/{name}/commits/{sha}/check-runs?per_page=100", token
                 )
                 runs = cr.get("check_runs") or []
-                names = {r.get("name"): r.get("conclusion") for r in runs}
-                checks["validate"] = names.get("validate") or "skipped"
-                checks["execute"] = (
-                    names.get("execute")
-                    or names.get("phone-loop-guard")
-                    or ("success" if names.get("validate") == "success" else "skipped")
-                )
+                checks.update(checks_from_runs(runs))
                 checks["jobs_ran_steps"] = any(
                     r.get("conclusion") == "success" and r.get("name")
                     for r in runs
                 )
                 for r in runs:
                     html = r.get("html_url") or ""
-                    if html and r.get("name") == "validate":
+                    if html and r.get("name") in REQUIRED_CHECKS:
                         github["ci_url"] = html
                         break
                 if not github.get("ci_url"):

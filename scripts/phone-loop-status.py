@@ -73,6 +73,8 @@ def evaluate_from_fixture(data: dict[str, Any]) -> dict[str, Any]:
     # S4
     if checks.get("missing_token"):
         steps.append(_unknown(4, "github checks token missing"))
+    elif "pending" in (checks.get("validate"), checks.get("execute")):
+        steps.append(_unknown(4, "checks pending"))
     elif checks.get("validate") == "success" and (
         checks.get("execute") == "success"
         or checks.get("execute") in ("skipped", None)
