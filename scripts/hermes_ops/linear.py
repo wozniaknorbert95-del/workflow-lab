@@ -41,6 +41,7 @@ query OpsQueue($first: Int!, $names: [String!]!) {
       title
       url
       state { name }
+      estimate
       labels { nodes { name } }
       project { name }
       attachments { nodes { url } }
@@ -100,6 +101,7 @@ def normalize_issue(node: dict[str, Any]) -> dict[str, Any]:
         "repo": repo,
         "github_number": number,
         "project": project_name,
+        "estimate": node.get("estimate"),
     }
 
 
